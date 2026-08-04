@@ -1,0 +1,15 @@
+{
+  "name": "kmcb-service-control-centre",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.mjs",
+    "svc": "node bin/svc.mjs",
+    "test": "node --test test/*.test.mjs",
+    "check": "node --check src/config.mjs && node --check src/process-manager.mjs && node --check src/server.mjs && node --check bin/svc.mjs && node --check public/app.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict'
+import fs from 'node:fs'
+import test from 'node:test'
+
+const html = fs.readFileSync(new URL('../public/index.html', import.meta.url), 'utf8')
+const app = fs.readFileSync(new URL('../public/app.js', import.meta.url), 'utf8')
+
+test('loads the dashboard application as an ES module', () => {
+  assert.match(html, /<script\s+type="module"\s+src="\/app\.js"><\/script>/)
+})
+
+test('uses project names as service card titles', () => {
+  assert.match(app, /<h3>\$\{escapeHtml\(service\.projectName\)\}<\/h3>/)
+  assert.match(app, /<span>\$\{escapeHtml\(service\.description\)\}<\/span>/)
+})

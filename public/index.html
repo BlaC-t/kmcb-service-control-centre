@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="control-token" content="__CONTROL_TOKEN__" />
+    <title>KMCB Service Control</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand-mark"></span>
+          <div>
+            <div class="eyebrow">LOCAL OPERATIONS / 本机运维</div>
+            <h1>KMCB 服务控制中心</h1>
+          </div>
+        </div>
+        <div class="top-actions">
+          <div class="live-indicator"><span></span> LIVE</div>
+          <button class="button secondary" id="refresh-button">刷新状态</button>
+        </div>
+      </header>
+
+      <main>
+        <section class="summary" aria-label="服务概览">
+          <article>
+            <span>已注册 REGISTERED</span>
+            <strong id="summary-total">--</strong>
+          </article>
+          <article class="good">
+            <span>运行中 RUNNING</span>
+            <strong id="summary-running">--</strong>
+          </article>
+          <article class="warn">
+            <span>异常 ATTENTION</span>
+            <strong id="summary-attention">--</strong>
+          </article>
+          <article>
+            <span>最后检测 LAST CHECK</span>
+            <strong class="time" id="last-check">--:--:--</strong>
+          </article>
+        </section>
+
+        <section class="notice">
+          <div class="notice-index">01</div>
+          <div>
+            <strong>统一端口，统一入口</strong>
+            <p>启动、停止和重启都由本页调用控制 API。端口被其他项目占用时会锁定操作，避免误杀进程。</p>
+          </div>
+          <code>127.0.0.1:17600</code>
+        </section>
+
+        <section class="service-section">
+          <div class="section-heading">
+            <div><span>02</span><h2>前端服务</h2></div>
+            <p>FRONTEND SERVICES</p>
+          </div>
+          <div class="service-grid" id="frontend-services"></div>
+        </section>
+
+        <section class="service-section">
+          <div class="section-heading">
+            <div><span>03</span><h2>后端服务</h2></div>
+            <p>BACKEND SERVICES</p>
+          </div>
+          <div class="service-grid" id="backend-services"></div>
+        </section>
+      </main>
+
+      <footer>
+        <span>KUNMING CIBA DIGGINGS MACHINERY</span>
+        <span>LOCALHOST ONLY · PROCESS CONTROL PROTECTED</span>
+      </footer>
+    </div>
+
+    <dialog id="log-dialog">
+      <div class="dialog-head">
+        <div>
+          <span class="eyebrow">SERVICE OUTPUT</span>
+          <h2 id="log-title">服务日志</h2>
+        </div>
+        <button class="icon-button" id="close-log" aria-label="关闭">×</button>
+      </div>
+      <pre id="log-content">暂无日志</pre>
+      <div class="dialog-actions">
+        <button class="button secondary" id="refresh-log">刷新日志</button>
+        <button class="button" id="close-log-bottom">关闭</button>
+      </div>
+    </dialog>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

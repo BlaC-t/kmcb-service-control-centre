@@ -1,0 +1,141 @@
+{
+  "title": "KMCB Local Service Control",
+  "host": "127.0.0.1",
+  "port": 17600,
+  "pollIntervalMs": 2000,
+  "startupTimeoutMs": 60000,
+  "stopTimeoutMs": 12000,
+  "workspaceRoot": "/Users/zhiyu/Documents/GitHub",
+  "services": [
+    {
+      "id": "admin-web",
+      "name": "管理后台",
+      "description": "BMS 前端",
+      "group": "frontend",
+      "cwd": "kmcb-admin-webapp",
+      "port": 5211,
+      "protocol": "http",
+      "openUrl": "http://127.0.0.1:5211",
+      "command": "exec npm run dev:mac"
+    },
+    {
+      "id": "customer-portal",
+      "name": "客户追溯门户",
+      "description": "客户账户与售后门户（保留旧 Trace 兼容入口）",
+      "group": "frontend",
+      "cwd": "kmcb-customer-portal-web",
+      "port": 3000,
+      "protocol": "https",
+      "openUrl": "https://127.0.0.1:3000",
+      "command": "exec npm run dev"
+    },
+    {
+      "id": "stm-gk-board",
+      "name": "STM-GK 数据看板",
+      "description": "STM-GK 数据看板",
+      "group": "frontend",
+      "cwd": "kmcb-stm-gk-web",
+      "port": 3100,
+      "protocol": "http",
+      "openUrl": "http://127.0.0.1:3100",
+      "command": "exec npm run dev -- -p 3100"
+    },
+    {
+      "id": "official-site",
+      "name": "企业官网",
+      "description": "企业官网",
+      "group": "frontend",
+      "cwd": "kmcb-official-ssr",
+      "port": 3200,
+      "protocol": "http",
+      "openUrl": "http://127.0.0.1:3200",
+      "command": "exec npm run dev -- --port 3200"
+    },
+    {
+      "id": "trace-web",
+      "name": "kmcb-trace-web",
+      "projectName": "kmcb-trace-web",
+      "description": "客户装运追溯与问题门户",
+      "group": "frontend",
+      "cwd": "kmcb-trace-web",
+      "port": 3300,
+      "protocol": "http",
+      "openUrl": "http://127.0.0.1:3300",
+      "command": "exec npm run dev"
+    },
+    {
+      "id": "main-api",
+      "name": "BMS 主 API",
+      "description": "BMS 主 API",
+      "group": "backend",
+      "cwd": "kmcb-admin-api/KJDigitalProject",
+      "port": 8084,
+      "protocol": "http",
+      "openUrl": "http://127.0.0.1:8084/swagger-ui.html",
+      "command": "mvn -q -pl KJ-web -am -DskipTests package && exec java -jar KJ-web/target/KJ-web-0.0.1-SNAPSHOT.jar --spring.profiles.active=dev"
+    },
+    {
+      "id": "crm-api",
+      "name": "StartApp",
+      "projectName": "kj-crm-api",
+      "description": "CRM 主业务后端 · 启动类 StartApp",
+      "group": "backend",
+      "cwd": "kmcb-crm-api",
+      "port": 7110,
+      "protocol": "http",
+      "openUrl": "http://127.0.0.1:7110/swagger-ui/index.html",
+      "env": {
+        "JAVA_HOME": "/Library/Java/JavaVirtualMachines/temurin-17.jdk/Contents/Home"
+      },
+      "command": "mvn -q -pl kj-crm-api -am -DskipTests package && exec java -jar kj-crm-api/target/kj-crm-api-1.0-SNAPSHOT.jar --spring.profiles.active=dev"
+    },
+    {
+      "id": "crm-gateway",
+      "name": "StartAppGateWay",
+      "projectName": "kj-crm-gateway-api",
+      "description": "客户门户网关 · 启动类 StartAppGateWay",
+      "group": "backend",
+      "cwd": "kmcb-crm-api",
+      "port": 7111,
+      "protocol": "http",
+      "openUrl": "http://127.0.0.1:7111",
+      "env": {
+        "JAVA_HOME": "/Library/Java/JavaVirtualMachines/temurin-17.jdk/Contents/Home"
+      },
+      "command": "mvn -q -pl kj-crm-gateway-api -am -DskipTests package && exec java -jar kj-crm-gateway-api/target/kj-crm-gateway-api-1.0-SNAPSHOT.jar --spring.profiles.active=dev"
+    },
+    {
+      "id": "intranet-api",
+      "name": "内网接口服务",
+      "description": "内网接口 API",
+      "group": "backend",
+      "cwd": "kmcb-intranet-interface-backend",
+      "port": 9094,
+      "protocol": "http",
+      "openUrl": "http://127.0.0.1:9094",
+      "command": "mvn -q -DskipTests package && exec java -jar target/KJIntranetService-0.0.1-SNAPSHOT.jar --spring.profiles.active=dev"
+    },
+    {
+      "id": "dts-api",
+      "name": "DTS 数据服务",
+      "description": "DTS 数据服务",
+      "group": "backend",
+      "cwd": "kmcb-dts-api",
+      "port": 10086,
+      "protocol": "http",
+      "openUrl": "http://127.0.0.1:10086",
+      "command": "mvn -q -DskipTests package && exec java -jar target/KJDTSProject-0.0.1-SNAPSHOT.jar --spring.profiles.active=dev"
+    },
+    {
+      "id": "imds-api",
+      "name": "IMDS 后端",
+      "description": "IMDS 后端",
+      "group": "backend",
+      "cwd": "kmcb-imds-backend/IdmsProject",
+      "port": 3112,
+      "protocol": "http",
+      "openUrl": "http://127.0.0.1:3112",
+      "command": "mvn -q -pl KJ-web -am -DskipTests package && exec java -jar KJ-web/target/KJ-web-0.0.1-SNAPSHOT.jar --spring.profiles.active=local"
+    }
+  ]
+}
