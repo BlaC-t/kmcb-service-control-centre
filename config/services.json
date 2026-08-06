@@ -20,6 +20,19 @@
       "commandWindows": "npm run dev"
     },
     {
+      "id": "mobile-web",
+      "name": "手机端前端",
+      "projectName": "kmcb-mobile",
+      "description": "KMCB uni-app 手机端 H5 调试服务",
+      "group": "frontend",
+      "cwd": "kmcb-mobile",
+      "port": 3400,
+      "protocol": "http",
+      "openUrl": "http://127.0.0.1:3400/webapp/",
+      "command": "exec node \"$SERVICE_CONTROL_ROOT/bin/uniapp-h5.mjs\" --port 3400",
+      "commandWindows": "node \"%SERVICE_CONTROL_ROOT%\\bin\\uniapp-h5.mjs\" --port 3400"
+    },
+    {
       "id": "customer-portal",
       "name": "客户追溯门户",
       "description": "客户账户与售后门户（保留旧 Trace 兼容入口）",

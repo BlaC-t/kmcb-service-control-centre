@@ -73,6 +73,9 @@ CRM API 和 CRM 客户网关固定使用项目要求的 Temurin Java 17，避免
 macOS 下秘密文件必须设置为权限 `600`。
 Windows runtime 默认位于 `%LOCALAPPDATA%\KMCBServiceControl\runtime`，并依赖当前用户目录 ACL 保护。
 
+`mobile-web` 服务会把 `kmcb-mobile` 作为 uni-app H5 项目运行在 `http://127.0.0.1:3400/webapp/`。
+启动器会自动查找标准位置中的 HBuilderX；如果安装在自定义目录，请设置 `HBUILDERX_HOME` 指向 HBuilderX 应用根目录。
+
 后端重启会先执行 Maven 打包，再运行对应可执行 JAR。
 这样可以避免本地 Maven 依赖过期，但首次启动会比前端服务慢。
 

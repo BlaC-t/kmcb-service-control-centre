@@ -47,6 +47,7 @@ Linux 尚未提供经过验证的安装流程。
 - npm。
 - Git，仅在通过 Git 获取或更新源码时需要。
 - 被管理项目自身需要的运行环境，例如 Maven、Java、pnpm 或 npm。
+- 管理 `mobile-web` 时需要安装 HBuilderX，标准 `/Applications/HBuilderX.app` 路径会被自动识别。
 
 执行以下命令检查基础环境：
 
@@ -60,6 +61,16 @@ git --version
 
 `node --version` 必须显示 `v20` 或更高主版本。
 本项目当前没有第三方 npm 依赖，因此不要求先执行 `npm install`。
+
+如果 HBuilderX 不在标准位置，请在 `mobile-web` 的 `envPosix` 中设置：
+
+```json
+"envPosix": {
+  "HBUILDERX_HOME": "/自定义目录/HBuilderX.app"
+}
+```
+
+启动器会使用 HBuilderX 自带的 Node.js、Vite 和 uni-app 编译器，不要求给 `kmcb-mobile` 增加 npm 启动脚本。
 
 ### 2.3 被管理项目必须先能独立运行
 

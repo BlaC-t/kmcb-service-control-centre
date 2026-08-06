@@ -5,9 +5,11 @@ import http from 'node:http'
 import https from 'node:https'
 import path from 'node:path'
 import { promisify } from 'node:util'
+import { fileURLToPath } from 'node:url'
 
 const execFileAsync = promisify(execFile)
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms))
+const controlRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
 export class ProcessManager extends EventEmitter {
   constructor(config, runtimeDir, options = {}) {
@@ -367,6 +369,7 @@ export function buildServiceEnvironment({
 
   result.SERVICE_CONTROL_ID = id
   result.SERVICE_CONTROL_PORT = String(port)
+  result.SERVICE_CONTROL_ROOT = controlRoot
 
   if (platform === 'win32') {
     const javaHomeKey = Object.keys(result).find(key => key.toLowerCase() === 'java_home')

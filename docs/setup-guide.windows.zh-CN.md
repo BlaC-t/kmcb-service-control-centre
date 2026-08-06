@@ -37,6 +37,7 @@ Windows 版本不会控制归属无法确认的外部进程。
 - Windows PowerShell 5.1 或 PowerShell 7。
 - Git，仅在通过 Git 获取和更新源码时需要。
 - 被管理项目自身需要的 npm、pnpm、Java、Maven 或其他运行时。
+- 管理 `mobile-web` 时需要安装 Windows 版 HBuilderX。
 
 在 PowerShell 中执行：
 
@@ -52,6 +53,17 @@ where.exe node
 `where.exe node` 应返回朋友计划长期使用的 Node.js 路径，因为安装脚本会把这个绝对路径写入运行包装脚本。
 
 项目当前没有第三方 npm 依赖，所以不需要先执行 `npm install`。
+
+手机端启动器会自动检查 `C:\HBuilderX`、`C:\Program Files\HBuilderX` 和 `%LOCALAPPDATA%\Programs\HBuilderX`。
+如果 HBuilderX 位于其他目录，请在 `mobile-web` 的 `envWindows` 中设置：
+
+```json
+"envWindows": {
+  "HBUILDERX_HOME": "D:/Developer Tools/HBuilderX"
+}
+```
+
+启动器会使用 HBuilderX 自带的 Node.js、Vite 和 uni-app 编译器。
 
 ## 3. 获取源码
 

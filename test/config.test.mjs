@@ -75,6 +75,27 @@ test('registers the standalone Trace frontend on its fixed port', () => {
   )
 })
 
+test('registers the mobile uni-app H5 frontend on its fixed port', () => {
+  const mobileWeb = registry.services.find(service => service.id === 'mobile-web')
+
+  assert.deepEqual(
+    {
+      projectName: mobileWeb?.projectName,
+      cwd: mobileWeb?.cwd,
+      port: mobileWeb?.port,
+      openUrl: mobileWeb?.openUrl,
+    },
+    {
+      projectName: 'kmcb-mobile',
+      cwd: 'kmcb-mobile',
+      port: 3400,
+      openUrl: 'http://127.0.0.1:3400/webapp/',
+    },
+  )
+  assert.match(mobileWeb?.command || '', /uniapp-h5\.mjs/)
+  assert.match(mobileWeb?.commandWindows || '', /uniapp-h5\.mjs/)
+})
+
 test('starts CRM services with the project Java 17 runtime', () => {
   const config = validateConfig(registry, { platform: 'darwin' })
   for (const id of ['crm-api', 'crm-gateway']) {

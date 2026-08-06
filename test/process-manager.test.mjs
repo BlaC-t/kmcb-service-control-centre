@@ -140,6 +140,7 @@ test('prepends envWindows JAVA_HOME to the Windows child PATH', () => {
   assert.equal('PATH' in env, false)
   assert.equal(env.SERVICE_CONTROL_ID, 'java-service')
   assert.equal(env.SERVICE_CONTROL_PORT, '8080')
+  assert.match(env.SERVICE_CONTROL_ROOT, /kmcb-service-control-centre$/)
 })
 
 test('controls only a listener inside its managed Windows process tree', async t => {

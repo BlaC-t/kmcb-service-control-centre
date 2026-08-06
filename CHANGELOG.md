@@ -4,6 +4,9 @@
 
 ### Added
 
+- Added the `kmcb-mobile` uni-app H5 frontend to the service registry as `mobile-web` on port `3400`.
+- Added a cross-platform HBuilderX launcher that finds the bundled Node.js and Vite compiler, with `HBUILDERX_HOME` support for custom installations.
+- Added HBuilderX's bundled uni-app modules and application-root markers to the mobile compiler environment so HBuilderX projects resolve built-in packages outside the IDE.
 - Added native Windows service lifecycle support using `cmd.exe`, `netstat.exe`, PowerShell process-tree discovery, and `taskkill.exe`.
 - Added per-platform `commandWindows`, `envPosix`, and `envWindows` registry fields while retaining the existing `command` and common `env` fields.
 - Added PowerShell install and uninstall scripts that use `%LOCALAPPDATA%`, a current-user logon scheduled task, and a user PATH CLI wrapper without requiring administrator elevation.
