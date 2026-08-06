@@ -176,6 +176,20 @@ for ($Attempt = 0; $Attempt -lt 50; $Attempt += 1) {
 }
 
 if (-not $Ready) {
+  $TaskInfo = Get-ScheduledTaskInfo -TaskName $TaskName -ErrorAction SilentlyContinue
+  $Task = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
+  if ($TaskInfo) {
+    Write-Warning "Scheduled task state: $($Task.State); last result: $($TaskInfo.LastTaskResult)"
+  }
+  if ($Task -and $Task.Actions) {
+    foreach ($TaskAction in $Task.Actions) {
+      Write-Warning "Scheduled task action: $($TaskAction.Execute) $($TaskAction.Arguments)"
+    }
+  }
+  $ControlLog = Join-Path $RuntimeDir 'control-center.log'
+  if (Test-Path -LiteralPath $ControlLog) {
+    Write-Warning (Get-Content -LiteralPath $ControlLog -Raw)
+  }
   throw "The scheduled task was installed, but the dashboard did not become ready. Check $RuntimeDir\control-center.log"
 }
 
