@@ -45,7 +45,7 @@ console.log(`${payload.service.id}: ${payload.service.state} on port ${payload.s
 
 async function ensureControlCenter() {
   try {
-    await request('/api/status', {}, 800)
+    await request('/api/status', {}, 5000)
     return
   } catch {
     fs.mkdirSync(runtimeDir, { recursive: true })
@@ -61,7 +61,7 @@ async function ensureControlCenter() {
     for (let attempt = 0; attempt < 30; attempt += 1) {
       await new Promise(resolve => setTimeout(resolve, 200))
       try {
-        await request('/api/status', {}, 800)
+        await request('/api/status', {}, 5000)
         return
       } catch {
         // Continue waiting for the control center bootstrap.

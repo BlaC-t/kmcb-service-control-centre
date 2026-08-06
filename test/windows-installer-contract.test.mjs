@@ -12,6 +12,8 @@ test('installs the Windows runtime per user with a logon task and CLI wrapper', 
   assert.match(installScript, /kmcb-svc\.cmd/)
   assert.match(installScript, /start-control-centre\.ps1/)
   assert.match(installScript, /Write-Utf8WithBom/)
+  assert.match(installScript, /SERVICE_CONTROL_RUNTIME/)
+  assert.match(installScript, /SERVICE_CONTROL_CONFIG/)
   assert.match(installScript, /SetEnvironmentVariable\('Path'.*'User'\)/)
 })
 
@@ -25,5 +27,6 @@ test('refuses to replace an unrelated Windows port owner', () => {
 test('can uninstall Windows while retaining runtime data', () => {
   assert.match(uninstallScript, /\[switch\]\$KeepRuntime/)
   assert.match(uninstallScript, /retained runtime data/)
+  assert.match(uninstallScript, /Get-CimInstance Win32_Process/)
   assert.match(uninstallScript, /SetEnvironmentVariable\('Path'.*'User'\)/)
 })

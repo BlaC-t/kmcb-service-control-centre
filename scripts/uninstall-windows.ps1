@@ -62,6 +62,23 @@ foreach ($Listener in $Listeners) {
   }
 }
 
+for ($Attempt = 0; $Attempt -lt 20; $Attempt += 1) {
+  $OwnedProcesses = @(
+    Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+      Where-Object {
+        [int]$_.ProcessId -ne $PID -and
+        (Test-CommandLineOwnedByControlCentre -CommandLine ([string]$_.CommandLine) -AllowedRoot $AppRoot)
+      }
+  )
+  if (-not $OwnedProcesses.Count) {
+    break
+  }
+  foreach ($ProcessInfo in $OwnedProcesses) {
+    Stop-Process -Id ([int]$ProcessInfo.ProcessId) -Force -ErrorAction SilentlyContinue
+  }
+  Start-Sleep -Milliseconds 100
+}
+
 if (-not $SkipPathUpdate) {
   $UserPath = [Environment]::GetEnvironmentVariable('Path', 'User')
   $RemainingPathParts = @(
@@ -81,7 +98,15 @@ if ($KeepRuntime) {
   }
   Write-Host "Uninstalled $TaskName and retained runtime data at $RuntimeDir"
 } elseif (Test-Path -LiteralPath $AppRoot) {
-  Remove-Item -LiteralPath $AppRoot -Recurse -Force
+  for ($Attempt = 0; $Attempt -lt 20; $Attempt += 1) {
+    try {
+      Remove-Item -LiteralPath $AppRoot -Recurse -Force
+      break
+    } catch [IO.IOException] {
+      if ($Attempt -eq 19) { throw }
+      Start-Sleep -Milliseconds 100
+    }
+  }
   Write-Host "Uninstalled $TaskName and removed $AppRoot"
 } else {
   Write-Host "Uninstalled $TaskName"

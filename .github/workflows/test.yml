@@ -59,7 +59,7 @@ jobs:
 
       - name: Smoke-test Windows install, task, CLI, API, and uninstall
         if: runner.os == 'Windows'
-        shell: powershell
+        shell: pwsh
         run: |
           Set-ExecutionPolicy -Scope Process Bypass -Force
           $smokeRoot = Join-Path $env:RUNNER_TEMP 'KMCB 控制中心 smoke'

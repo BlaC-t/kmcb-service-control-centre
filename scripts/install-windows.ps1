@@ -108,6 +108,8 @@ Copy-Item -LiteralPath (Join-Path $ToolRoot 'package.json') -Destination (Join-P
 $CliWrapper = Join-Path $BinDir 'kmcb-svc.cmd'
 $CliContent = @"
 @echo off
+set "SERVICE_CONTROL_RUNTIME=%~dp0..\runtime"
+set "SERVICE_CONTROL_CONFIG=%~dp0..\config\services.json"
 node "%~dp0svc.mjs" %*
 "@
 Write-Ascii -Path $CliWrapper -Content $CliContent
@@ -118,6 +120,8 @@ $ServerContent = @"
 `$ErrorActionPreference = 'Stop'
 `$AppRoot = (Resolve-Path (Join-Path `$PSScriptRoot '..')).Path
 `$RuntimeDir = Join-Path `$AppRoot 'runtime'
+`$env:SERVICE_CONTROL_RUNTIME = `$RuntimeDir
+`$env:SERVICE_CONTROL_CONFIG = Join-Path `$AppRoot 'config\services.json'
 Set-Location `$AppRoot
 & '$EscapedNodePath' (Join-Path `$AppRoot 'src\server.mjs') *>> (Join-Path `$RuntimeDir 'control-center.log')
 "@

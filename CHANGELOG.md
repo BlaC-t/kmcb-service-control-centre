@@ -17,6 +17,7 @@
 - Updated the example registry with Windows commands and kept the fixed macOS Java 17 paths in `envPosix` only.
 - Made `npm test` enumerate `*.test.mjs` files in JavaScript so the test command works in both POSIX shells and Windows PowerShell without treating fixture programs as tests.
 - Made Windows `cmd.exe` launch quoting explicit and made runtime path construction independent of the operating system running the test.
+- Bound installed Windows CLI and scheduled-task processes to the installed config and runtime directories, allowed for process-inspection latency, and made uninstall wait for scoped process handles to close.
 
 ### Security
 
