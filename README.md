@@ -15,12 +15,17 @@
 
 ## 使用
 
+第一次在另一台 Mac 上安装，或接收者的用户名、工作区和 Java 路径与 Titus 不同时，请先完整阅读 [详细安装与迁移指南](docs/setup-guide.zh-CN.md)。
+
 首次安装为 macOS 登录服务：
 
 ```bash
-cd /Users/zhiyu/Documents/GitHub/kmcb-service-control-centre
+KMCB_CONTROL_REPO="/Users/your-name/Projects/kmcb-service-control-centre"
+cd "$KMCB_CONTROL_REPO"
 ./scripts/install-launch-agent.sh
 ```
+
+请把示例路径替换为本机真实源码路径，并在安装前逐项修改 `config/services.json` 中的 `workspaceRoot`、`cwd`、端口、命令和运行时路径。
 
 安装脚本会把运行副本放到 `~/Library/Application Support/KMCBServiceControl`，避免 macOS 后台进程直接访问 `Documents` 中的工具源码时被系统拦截。
 源码和服务注册表位于独立的 `kmcb-service-control-centre` Git 仓库中，修改后重新执行安装脚本即可更新运行副本。
@@ -31,12 +36,12 @@ cd /Users/zhiyu/Documents/GitHub/kmcb-service-control-centre
 http://127.0.0.1:17600
 ```
 
-命令行也必须通过控制中心 API：
+安装后，命令行也必须通过控制中心 API：
 
 ```bash
-npm run svc -- status
-npm run svc -- restart stm-gk-board
-npm run svc -- logs stm-gk-board
+kmcb-svc status
+kmcb-svc restart stm-gk-board
+kmcb-svc logs stm-gk-board
 ```
 
 控制中心未运行时，CLI 会自动引导启动控制中心本身。

@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-08-06
+
+### Documentation
+
+- Added a detailed Chinese setup and migration guide for sharing the tool with users whose repository, workspace, runtime, and home-directory paths differ.
+- Documented macOS and Node.js prerequisites, registry customization, secret environment files, LaunchAgent installation, CLI setup, verification, updates, diagnostics, safe uninstallation, and sharing checklists.
+- Replaced the README's machine-specific source path and source-tree CLI examples with a portable path placeholder and the installed `kmcb-svc` command.
+
+### Known Limitations
+
+- Documented that macOS is the only verified platform, the installer's control-port preflight is fixed to `17600`, and `config/services.json` remains a Git-tracked machine-specific file.
+
 ## 2026-08-04
 
 ### Added
