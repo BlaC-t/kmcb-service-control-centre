@@ -16,7 +16,8 @@
       "port": 5211,
       "protocol": "http",
       "openUrl": "http://127.0.0.1:5211",
-      "command": "exec npm run dev:mac"
+      "command": "exec npm run dev:mac",
+      "commandWindows": "npm run dev"
     },
     {
       "id": "customer-portal",
@@ -27,7 +28,8 @@
       "port": 3000,
       "protocol": "https",
       "openUrl": "https://127.0.0.1:3000",
-      "command": "exec npm run dev"
+      "command": "exec npm run dev",
+      "commandWindows": "npm run dev"
     },
     {
       "id": "stm-gk-board",
@@ -38,7 +40,8 @@
       "port": 3100,
       "protocol": "http",
       "openUrl": "http://127.0.0.1:3100",
-      "command": "exec npm run dev -- -p 3100"
+      "command": "exec npm run dev -- -p 3100",
+      "commandWindows": "npm run dev -- -p 3100"
     },
     {
       "id": "official-site",
@@ -49,7 +52,8 @@
       "port": 3200,
       "protocol": "http",
       "openUrl": "http://127.0.0.1:3200",
-      "command": "exec npm run dev -- --port 3200"
+      "command": "exec npm run dev -- --port 3200",
+      "commandWindows": "npm run dev -- --port 3200"
     },
     {
       "id": "trace-web",
@@ -61,7 +65,8 @@
       "port": 3300,
       "protocol": "http",
       "openUrl": "http://127.0.0.1:3300",
-      "command": "exec npm run dev"
+      "command": "exec npm run dev",
+      "commandWindows": "npm run dev"
     },
     {
       "id": "main-api",
@@ -72,7 +77,8 @@
       "port": 8084,
       "protocol": "http",
       "openUrl": "http://127.0.0.1:8084/swagger-ui.html",
-      "command": "mvn -q -pl KJ-web -am -DskipTests package && exec java -jar KJ-web/target/KJ-web-0.0.1-SNAPSHOT.jar --spring.profiles.active=dev"
+      "command": "mvn -q -pl KJ-web -am -DskipTests package && exec java -jar KJ-web/target/KJ-web-0.0.1-SNAPSHOT.jar --spring.profiles.active=dev",
+      "commandWindows": "mvn -q -pl KJ-web -am -DskipTests package && java -jar KJ-web/target/KJ-web-0.0.1-SNAPSHOT.jar --spring.profiles.active=dev"
     },
     {
       "id": "crm-api",
@@ -84,10 +90,11 @@
       "port": 7110,
       "protocol": "http",
       "openUrl": "http://127.0.0.1:7110/swagger-ui/index.html",
-      "env": {
+      "envPosix": {
         "JAVA_HOME": "/Library/Java/JavaVirtualMachines/temurin-17.jdk/Contents/Home"
       },
-      "command": "mvn -q -pl kj-crm-api -am -DskipTests package && exec java -jar kj-crm-api/target/kj-crm-api-1.0-SNAPSHOT.jar --spring.profiles.active=dev"
+      "command": "mvn -q -pl kj-crm-api -am -DskipTests package && exec java -jar kj-crm-api/target/kj-crm-api-1.0-SNAPSHOT.jar --spring.profiles.active=dev",
+      "commandWindows": "mvn -q -pl kj-crm-api -am -DskipTests package && java -jar kj-crm-api/target/kj-crm-api-1.0-SNAPSHOT.jar --spring.profiles.active=dev"
     },
     {
       "id": "crm-gateway",
@@ -99,10 +106,11 @@
       "port": 7111,
       "protocol": "http",
       "openUrl": "http://127.0.0.1:7111",
-      "env": {
+      "envPosix": {
         "JAVA_HOME": "/Library/Java/JavaVirtualMachines/temurin-17.jdk/Contents/Home"
       },
-      "command": "mvn -q -pl kj-crm-gateway-api -am -DskipTests package && exec java -jar kj-crm-gateway-api/target/kj-crm-gateway-api-1.0-SNAPSHOT.jar --spring.profiles.active=dev"
+      "command": "mvn -q -pl kj-crm-gateway-api -am -DskipTests package && exec java -jar kj-crm-gateway-api/target/kj-crm-gateway-api-1.0-SNAPSHOT.jar --spring.profiles.active=dev",
+      "commandWindows": "mvn -q -pl kj-crm-gateway-api -am -DskipTests package && java -jar kj-crm-gateway-api/target/kj-crm-gateway-api-1.0-SNAPSHOT.jar --spring.profiles.active=dev"
     },
     {
       "id": "intranet-api",
@@ -113,7 +121,8 @@
       "port": 9094,
       "protocol": "http",
       "openUrl": "http://127.0.0.1:9094",
-      "command": "mvn -q -DskipTests package && exec java -jar target/KJIntranetService-0.0.1-SNAPSHOT.jar --spring.profiles.active=dev"
+      "command": "mvn -q -DskipTests package && exec java -jar target/KJIntranetService-0.0.1-SNAPSHOT.jar --spring.profiles.active=dev",
+      "commandWindows": "mvn -q -DskipTests package && java -jar target/KJIntranetService-0.0.1-SNAPSHOT.jar --spring.profiles.active=dev"
     },
     {
       "id": "dts-api",
@@ -124,7 +133,8 @@
       "port": 10086,
       "protocol": "http",
       "openUrl": "http://127.0.0.1:10086",
-      "command": "mvn -q -DskipTests package && exec java -jar target/KJDTSProject-0.0.1-SNAPSHOT.jar --spring.profiles.active=dev"
+      "command": "mvn -q -DskipTests package && exec java -jar target/KJDTSProject-0.0.1-SNAPSHOT.jar --spring.profiles.active=dev",
+      "commandWindows": "mvn -q -DskipTests package && java -jar target/KJDTSProject-0.0.1-SNAPSHOT.jar --spring.profiles.active=dev"
     },
     {
       "id": "imds-api",
@@ -135,7 +145,8 @@
       "port": 3112,
       "protocol": "http",
       "openUrl": "http://127.0.0.1:3112",
-      "command": "mvn -q -pl KJ-web -am -DskipTests package && exec java -jar KJ-web/target/KJ-web-0.0.1-SNAPSHOT.jar --spring.profiles.active=local"
+      "command": "mvn -q -pl KJ-web -am -DskipTests package && exec java -jar KJ-web/target/KJ-web-0.0.1-SNAPSHOT.jar --spring.profiles.active=local",
+      "commandWindows": "mvn -q -pl KJ-web -am -DskipTests package && java -jar KJ-web/target/KJ-web-0.0.1-SNAPSHOT.jar --spring.profiles.active=local"
     }
   ]
 }

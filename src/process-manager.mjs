@@ -10,10 +10,16 @@ const execFileAsync = promisify(execFile)
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms))
 
 export class ProcessManager extends EventEmitter {
-  constructor(config, runtimeDir) {
+  constructor(config, runtimeDir, options = {}) {
     super()
     this.config = config
     this.runtimeDir = runtimeDir
+    this.platform = options.platform || process.platform
+    this.findListeners = options.findListeners || (port => findListenerDetails(port, this.platform))
+    this.windowsProcessTree = options.windowsProcessTree || windowsProcessTreePids
+    this.windowsInspection = options.windowsInspection || inspectWindowsProcesses
+    this.terminateWindowsTree = options.terminateWindowsTree || terminateWindowsProcessTree
+    this.spawnProcess = options.spawnProcess || spawn
     this.logsDir = path.join(runtimeDir, 'logs')
     this.statePath = path.join(runtimeDir, 'state.json')
     this.locks = new Map()
@@ -22,7 +28,10 @@ export class ProcessManager extends EventEmitter {
   }
 
   async statuses() {
-    const services = await Promise.all(this.config.services.map(service => this.status(service.id)))
+    const inspection = this.platform === 'win32'
+      ? await this.windowsInspection(this.config.services.map(service => service.port))
+      : null
+    const services = await Promise.all(this.config.services.map(service => this.status(service.id, inspection)))
     for (const service of services) service.busy = this.locks.has(service.id)
     return {
       generatedAt: new Date().toISOString(),
@@ -31,13 +40,28 @@ export class ProcessManager extends EventEmitter {
     }
   }
 
-  async status(id) {
+  async status(id, inspection = null) {
     const service = this.getService(id)
-    const listeners = await findListenerDetails(service.port)
-    const matching = listeners.filter(listener => sameOrChildPath(listener.cwd, service.cwd))
-    const conflicts = listeners.filter(listener => !sameOrChildPath(listener.cwd, service.cwd))
+    const listeners = inspection?.listenersByPort?.get(service.port) || await this.findListeners(service.port)
     const managed = this.state.services[id]
     const managedAlive = managed ? isPidAlive(managed.pid) : false
+    let managedOwned = managedAlive
+    let matching
+    let conflicts
+
+    if (this.platform === 'win32') {
+      const managedPids = managedAlive
+        ? inspection?.processes
+          ? windowsManagedProcessIds(inspection.processes, managed)
+          : await this.windowsProcessTree(managed.pid, managed.command, managed.startedAt)
+        : new Set()
+      managedOwned = managedPids.size > 0
+      matching = listeners.filter(listener => managedPids.has(listener.pid))
+      conflicts = listeners.filter(listener => !managedPids.has(listener.pid))
+    } else {
+      matching = listeners.filter(listener => sameOrChildPath(listener.cwd, service.cwd))
+      conflicts = listeners.filter(listener => !sameOrChildPath(listener.cwd, service.cwd))
+    }
 
     if (conflicts.length && !matching.length) {
       return serviceStatus(service, {
@@ -66,7 +90,7 @@ export class ProcessManager extends EventEmitter {
       })
     }
 
-    if (managedAlive) {
+    if (managedAlive && managedOwned) {
       const startedAt = Date.parse(managed.startedAt)
       const startupTimedOut = Number.isFinite(startedAt)
         && Date.now() - startedAt >= this.config.startupTimeoutMs
@@ -82,7 +106,7 @@ export class ProcessManager extends EventEmitter {
       })
     }
 
-    if (managed && !managedAlive) {
+    if (managed && (!managedAlive || !managedOwned)) {
       delete this.state.services[id]
       this.persistState()
     }
@@ -135,19 +159,23 @@ export class ProcessManager extends EventEmitter {
     rotateLog(logPath)
     const logFd = fs.openSync(logPath, 'a')
     fs.appendFileSync(logPath, `\n[control] ${new Date().toISOString()} starting ${id}\n$ ${service.command}\n`)
-    const secretEnv = loadServiceSecretEnv(this.runtimeDir, service.id)
+    const secretEnv = loadServiceSecretEnv(this.runtimeDir, service.id, this.platform)
 
-    const child = spawn('/bin/zsh', ['-lc', service.command], {
+    const launch = commandLaunchSpec(service.command, this.platform)
+    const childEnv = buildServiceEnvironment({
+      baseEnv: process.env,
+      serviceEnv: service.env,
+      secretEnv,
+      id,
+      port: service.port,
+      platform: this.platform,
+    })
+    const child = this.spawnProcess(launch.file, launch.args, {
       cwd: service.cwd,
       detached: true,
+      windowsHide: true,
       stdio: ['ignore', logFd, logFd],
-      env: {
-        ...process.env,
-        ...service.env,
-        ...secretEnv,
-        SERVICE_CONTROL_ID: id,
-        SERVICE_CONTROL_PORT: String(service.port),
-      },
+      env: childEnv,
     })
     child.unref()
     fs.closeSync(logFd)
@@ -169,7 +197,14 @@ export class ProcessManager extends EventEmitter {
     if (current.state === 'conflict') throw new Error(current.message)
 
     const managed = this.state.services[id]
-    if (managed && isPidAlive(managed.pid)) {
+    let windowsManagedPids = new Set()
+    if (this.platform === 'win32' && managed && isPidAlive(managed.pid)) {
+      windowsManagedPids = await this.windowsProcessTree(managed.pid, managed.command, managed.startedAt)
+      if (!windowsManagedPids.size) {
+        throw new Error(`Refusing to stop PID ${managed.pid}: managed process identity mismatch.`)
+      }
+      await this.terminateWindowsTree(managed.pid)
+    } else if (managed && isPidAlive(managed.pid)) {
       safeKill(-managed.pid, 'SIGTERM')
     } else if (current.pid) {
       const actualCwd = await processCwd(current.pid)
@@ -180,12 +215,17 @@ export class ProcessManager extends EventEmitter {
     }
 
     const stopped = await waitFor(async () => {
-      const listeners = await findListenerDetails(service.port)
+      const listeners = await this.findListeners(service.port)
+      if (this.platform === 'win32') {
+        return !listeners.some(listener => windowsManagedPids.has(listener.pid))
+      }
       return !listeners.some(listener => sameOrChildPath(listener.cwd, service.cwd))
     }, this.config.stopTimeoutMs)
 
     if (!stopped) {
-      if (managed && isPidAlive(managed.pid)) safeKill(-managed.pid, 'SIGKILL')
+      if (this.platform === 'win32' && managed && isPidAlive(managed.pid)) {
+        await this.terminateWindowsTree(managed.pid)
+      } else if (managed && isPidAlive(managed.pid)) safeKill(-managed.pid, 'SIGKILL')
       else if (current.pid) safeKill(current.pid, 'SIGKILL')
       await delay(250)
     }
@@ -226,12 +266,12 @@ export class ProcessManager extends EventEmitter {
   }
 }
 
-export function loadServiceSecretEnv(runtimeDir, serviceId) {
+export function loadServiceSecretEnv(runtimeDir, serviceId, platform = process.platform) {
   const envPath = path.join(runtimeDir, 'service-env', `${serviceId}.env`)
   if (!fs.existsSync(envPath)) return {}
 
   const mode = fs.statSync(envPath).mode & 0o777
-  if ((mode & 0o077) !== 0) {
+  if (platform !== 'win32' && (mode & 0o077) !== 0) {
     throw new Error(`Secret environment file must use mode 600: ${envPath}`)
   }
 
@@ -259,7 +299,9 @@ function unquoteEnvValue(value) {
   return value
 }
 
-export async function findListenerDetails(port) {
+export async function findListenerDetails(port, platform = process.platform) {
+  if (platform === 'win32') return findWindowsListenerDetails(port)
+
   let stdout
   try {
     const result = await execFileAsync('/usr/sbin/lsof', ['-nP', `-iTCP:${port}`, '-sTCP:LISTEN', '-Fp'])
@@ -277,7 +319,9 @@ export async function findListenerDetails(port) {
   })))
 }
 
-export async function processCwd(pid) {
+export async function processCwd(pid, platform = process.platform) {
+  if (platform === 'win32') return null
+
   try {
     const { stdout } = await execFileAsync('/usr/sbin/lsof', ['-a', '-p', String(pid), '-d', 'cwd', '-Fn'])
     const line = stdout.split(/\r?\n/).find(item => item.startsWith('n'))
@@ -285,6 +329,211 @@ export async function processCwd(pid) {
   } catch {
     return null
   }
+}
+
+export function commandLaunchSpec(command, platform = process.platform, env = process.env) {
+  if (platform === 'win32') {
+    return {
+      file: env.ComSpec || env.COMSPEC || 'cmd.exe',
+      args: ['/d', '/s', '/c', command],
+    }
+  }
+
+  return { file: '/bin/zsh', args: ['-lc', command] }
+}
+
+export function buildServiceEnvironment({
+  baseEnv = process.env,
+  serviceEnv = {},
+  secretEnv = {},
+  id,
+  port,
+  platform = process.platform,
+}) {
+  const sources = [baseEnv, serviceEnv, secretEnv]
+  const result = {}
+
+  for (const source of sources) {
+    for (const [key, value] of Object.entries(source)) {
+      if (platform === 'win32') {
+        const existingKey = Object.keys(result).find(item => item.toLowerCase() === key.toLowerCase())
+        if (existingKey) delete result[existingKey]
+      }
+      result[key] = value
+    }
+  }
+
+  result.SERVICE_CONTROL_ID = id
+  result.SERVICE_CONTROL_PORT = String(port)
+
+  if (platform === 'win32') {
+    const javaHomeKey = Object.keys(result).find(key => key.toLowerCase() === 'java_home')
+    if (javaHomeKey) {
+      const pathKey = Object.keys(result).find(key => key.toLowerCase() === 'path')
+      const javaBin = path.win32.join(String(result[javaHomeKey]), 'bin')
+      const currentPath = pathKey ? String(result[pathKey] || '') : ''
+      if (pathKey) delete result[pathKey]
+      result.Path = currentPath ? `${javaBin};${currentPath}` : javaBin
+    }
+  }
+
+  return result
+}
+
+export function parseWindowsNetstat(stdout, port) {
+  const pids = new Set()
+  for (const sourceLine of String(stdout || '').split(/\r?\n/)) {
+    const columns = sourceLine.trim().split(/\s+/)
+    if (columns.length < 5 || columns[0].toUpperCase() !== 'TCP') continue
+    if (columns.at(-2).toUpperCase() !== 'LISTENING') continue
+    const localPort = Number(columns[1].match(/:(\d+)$/)?.[1])
+    const pid = Number(columns.at(-1))
+    if (localPort === Number(port) && Number.isInteger(pid) && pid > 0) pids.add(pid)
+  }
+  return [...pids]
+}
+
+export function descendantProcessIds(processes, rootPid) {
+  const result = new Set([Number(rootPid)])
+  let changed = true
+  while (changed) {
+    changed = false
+    for (const processInfo of processes) {
+      const pid = Number(processInfo.processId ?? processInfo.ProcessId)
+      const parentPid = Number(processInfo.parentProcessId ?? processInfo.ParentProcessId)
+      if (Number.isInteger(pid) && result.has(parentPid) && !result.has(pid)) {
+        result.add(pid)
+        changed = true
+      }
+    }
+  }
+  return result
+}
+
+export function windowsManagedProcessIds(processes, managed) {
+  const rootPid = Number(managed?.pid)
+  const expectedCommand = String(managed?.command || '').trim()
+  const expectedStartedAt = Date.parse(managed?.startedAt)
+  if (!Number.isInteger(rootPid) || !expectedCommand || !Number.isFinite(expectedStartedAt)) return new Set()
+
+  const root = processes.find(processInfo => Number(processInfo.processId ?? processInfo.ProcessId) === rootPid)
+  const commandLine = String(root?.commandLine ?? root?.CommandLine ?? '')
+  if (!commandLine || !commandLine.toLowerCase().includes(expectedCommand.toLowerCase())) return new Set()
+  const actualStartedAt = windowsCreationTimeMs(root?.creationDate ?? root?.CreationDate)
+  if (!Number.isFinite(actualStartedAt) || Math.abs(actualStartedAt - expectedStartedAt) > 15000) return new Set()
+  return descendantProcessIds(processes, rootPid)
+}
+
+export function windowsCreationTimeMs(value) {
+  const source = String(value || '')
+  const dotNetMatch = source.match(/^\/Date\((\d+)(?:[+-]\d+)?\)\/$/)
+  if (dotNetMatch) return Number(dotNetMatch[1])
+  return Date.parse(source)
+}
+
+export async function windowsProcessTreePids(rootPid, expectedCommand, expectedStartedAt) {
+  try {
+    const processes = await listWindowsProcesses()
+    return windowsManagedProcessIds(processes, {
+      pid: rootPid,
+      command: expectedCommand,
+      startedAt: expectedStartedAt,
+    })
+  } catch {
+    return new Set()
+  }
+}
+
+export async function inspectWindowsProcesses(ports) {
+  const requestedPorts = new Set(ports.map(Number))
+  const script = [
+    '$connections = @(Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue | Select-Object LocalPort,OwningProcess)',
+    '$processes = @(Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,CommandLine,CreationDate)',
+    '[pscustomobject]@{ connections = $connections; processes = $processes } | ConvertTo-Json -Compress -Depth 3',
+  ].join('; ')
+
+  try {
+    const parsed = await runWindowsPowerShellJson(script)
+    const processes = arrayValue(parsed?.processes ?? parsed?.Processes)
+    const listenersByPort = new Map([...requestedPorts].map(port => [port, []]))
+    for (const connection of arrayValue(parsed?.connections ?? parsed?.Connections)) {
+      const port = Number(connection.localPort ?? connection.LocalPort)
+      const pid = Number(connection.owningProcess ?? connection.OwningProcess)
+      if (!requestedPorts.has(port) || !Number.isInteger(pid) || pid <= 0) continue
+      const listeners = listenersByPort.get(port)
+      if (!listeners.some(listener => listener.pid === pid)) {
+        listeners.push({ pid, cwd: null, command: null })
+      }
+    }
+    return { listenersByPort, processes }
+  } catch {
+    return inspectWindowsProcessesWithNetstat(requestedPorts)
+  }
+}
+
+export async function terminateWindowsProcessTree(pid) {
+  if (!isPidAlive(pid)) return
+  try {
+    await execFileAsync('taskkill.exe', ['/PID', String(pid), '/T', '/F'])
+  } catch (error) {
+    if (isPidAlive(pid)) throw error
+  }
+}
+
+async function findWindowsListenerDetails(port) {
+  const inspection = await inspectWindowsProcesses([port])
+  return inspection.listenersByPort.get(Number(port)) || []
+}
+
+async function listWindowsProcesses() {
+  const script = [
+    'Get-CimInstance Win32_Process',
+    'Select-Object ProcessId,ParentProcessId,CommandLine,CreationDate',
+    'ConvertTo-Json -Compress',
+  ].join(' | ')
+  return arrayValue(await runWindowsPowerShellJson(script))
+}
+
+async function runWindowsPowerShellJson(script) {
+  const { stdout } = await execFileAsync('powershell.exe', [
+    '-NoLogo',
+    '-NoProfile',
+    '-NonInteractive',
+    '-Command',
+    script,
+  ], { maxBuffer: 4 * 1024 * 1024 })
+  return stdout.trim() ? JSON.parse(stdout.trim()) : null
+}
+
+async function inspectWindowsProcessesWithNetstat(requestedPorts) {
+  let stdout
+  try {
+    const result = await execFileAsync('netstat.exe', ['-ano', '-p', 'tcp'], { maxBuffer: 4 * 1024 * 1024 })
+    stdout = result.stdout
+  } catch (error) {
+    if (error.code === 1) {
+      return {
+        listenersByPort: new Map([...requestedPorts].map(port => [port, []])),
+        processes: null,
+      }
+    }
+    throw error
+  }
+
+  const listenersByPort = new Map()
+  for (const port of requestedPorts) {
+    listenersByPort.set(port, parseWindowsNetstat(stdout, port).map(pid => ({
+      pid,
+      cwd: null,
+      command: null,
+    })))
+  }
+  return { listenersByPort, processes: null }
+}
+
+function arrayValue(value) {
+  if (value === null || value === undefined) return []
+  return Array.isArray(value) ? value : [value]
 }
 
 async function processCommand(pid) {
@@ -350,7 +599,8 @@ function isPidAlive(pid) {
   try {
     process.kill(Number(pid), 0)
     return true
-  } catch {
+  } catch (error) {
+    if (error.code === 'EPERM') return true
     return false
   }
 }

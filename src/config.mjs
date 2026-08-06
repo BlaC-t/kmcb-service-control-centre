@@ -5,14 +5,14 @@ import { fileURLToPath } from 'node:url'
 export const TOOL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 export const DEFAULT_CONFIG_PATH = path.join(TOOL_ROOT, 'config', 'services.json')
 
-export function loadConfig(configPath = process.env.SERVICE_CONTROL_CONFIG || DEFAULT_CONFIG_PATH) {
+export function loadConfig(configPath = process.env.SERVICE_CONTROL_CONFIG || DEFAULT_CONFIG_PATH, options = {}) {
   const absoluteConfigPath = path.resolve(configPath)
   const raw = JSON.parse(fs.readFileSync(absoluteConfigPath, 'utf8'))
-  const config = validateConfig(raw)
+  const config = validateConfig(raw, options)
   return { ...config, configPath: absoluteConfigPath }
 }
 
-export function validateConfig(raw) {
+export function validateConfig(raw, { platform = process.platform } = {}) {
   if (!raw || typeof raw !== 'object') throw new Error('Service configuration must be an object.')
 
   const host = String(raw.host || '127.0.0.1')
@@ -45,8 +45,13 @@ export function validateConfig(raw) {
     const protocol = String(service.protocol || 'http')
     if (!['http', 'https', 'tcp'].includes(protocol)) throw new Error(`${id} has an unsupported protocol.`)
 
-    const command = String(service.command || '').trim()
+    const sourceCommand = platform === 'win32' && service.commandWindows
+      ? service.commandWindows
+      : service.command
+    const command = normalizeCommand(sourceCommand, platform)
     if (!command) throw new Error(`${id} command is required.`)
+
+    const platformEnv = platform === 'win32' ? service.envWindows : service.envPosix
 
     const cwdLabel = path.relative(workspaceRoot, cwd) || '.'
 
@@ -62,7 +67,10 @@ export function validateConfig(raw) {
       protocol,
       openUrl: String(service.openUrl || `${protocol === 'tcp' ? 'http' : protocol}://127.0.0.1:${servicePort}`),
       command,
-      env: normalizeEnv(service.env),
+      env: {
+        ...normalizeEnv(service.env),
+        ...normalizeEnv(platformEnv),
+      },
     }
   })
 
@@ -76,6 +84,12 @@ export function validateConfig(raw) {
     stopTimeoutMs: positiveInteger(raw.stopTimeoutMs, 12000),
     services: normalized,
   }
+}
+
+export function normalizeCommand(value, platform = process.platform) {
+  const command = String(value || '').trim()
+  if (platform !== 'win32') return command
+  return command.replace(/(^|(?:&&|\|\|)\s*)exec\s+/g, '$1')
 }
 
 function normalizeEnv(value) {

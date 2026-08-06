@@ -1,14 +1,16 @@
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 import test from 'node:test'
-import { validateConfig } from '../src/config.mjs'
+import { normalizeCommand, validateConfig } from '../src/config.mjs'
 
 const registry = JSON.parse(fs.readFileSync(new URL('../config/services.json', import.meta.url), 'utf8'))
 
 const base = {
   host: '127.0.0.1',
   port: 17600,
-  workspaceRoot: '/tmp',
+  workspaceRoot: os.tmpdir(),
   services: [
     {
       id: 'fixture',
@@ -23,7 +25,7 @@ const base = {
 
 test('normalizes a valid localhost-only registry', () => {
   const config = validateConfig(base)
-  assert.equal(config.services[0].cwd, pathJoinReal('/tmp', 'fixture'))
+  assert.equal(config.services[0].cwd, pathJoinReal(os.tmpdir(), 'fixture'))
   assert.equal(config.services[0].projectName, 'fixture')
   assert.equal(config.services[0].port, 17601)
 })
@@ -74,11 +76,32 @@ test('registers the standalone Trace frontend on its fixed port', () => {
 })
 
 test('starts CRM services with the project Java 17 runtime', () => {
+  const config = validateConfig(registry, { platform: 'darwin' })
   for (const id of ['crm-api', 'crm-gateway']) {
-    const service = registry.services.find(candidate => candidate.id === id)
+    const service = config.services.find(candidate => candidate.id === id)
     assert.ok(service, `${id} must be registered`)
-    assert.equal(service.env?.JAVA_HOME, '/Library/Java/JavaVirtualMachines/temurin-17.jdk/Contents/Home')
+    assert.equal(service.env.JAVA_HOME, '/Library/Java/JavaVirtualMachines/temurin-17.jdk/Contents/Home')
   }
+})
+
+test('selects Windows commands without inheriting the macOS Java path', () => {
+  const config = validateConfig(registry, { platform: 'win32' })
+  const adminWeb = config.services.find(service => service.id === 'admin-web')
+  const mainApi = config.services.find(service => service.id === 'main-api')
+  const crmApi = config.services.find(service => service.id === 'crm-api')
+
+  assert.equal(adminWeb?.command, 'npm run dev')
+  assert.doesNotMatch(mainApi?.command || '', /\bexec\b/)
+  assert.equal(crmApi?.env.JAVA_HOME, undefined)
+})
+
+test('normalizes POSIX exec commands for Windows when no override is present', () => {
+  assert.equal(normalizeCommand('exec npm run dev', 'win32'), 'npm run dev')
+  assert.equal(
+    normalizeCommand('mvn package && exec java -jar app.jar', 'win32'),
+    'mvn package && java -jar app.jar',
+  )
+  assert.equal(normalizeCommand('exec npm run dev', 'darwin'), 'exec npm run dev')
 })
 
 test('distinguishes the CRM main application from its customer gateway', () => {
@@ -115,5 +138,5 @@ test('distinguishes the CRM main application from its customer gateway', () => {
 })
 
 function pathJoinReal(parent, child) {
-  return `${fs.realpathSync.native(parent)}/${child}`
+  return path.join(fs.realpathSync.native(parent), child)
 }

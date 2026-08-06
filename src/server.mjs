@@ -1,15 +1,15 @@
 import crypto from 'node:crypto'
 import fs from 'node:fs'
 import http from 'node:http'
-import os from 'node:os'
 import path from 'node:path'
 import { loadConfig, TOOL_ROOT } from './config.mjs'
 import { ProcessManager } from './process-manager.mjs'
+import { defaultRuntimeDir } from './runtime-paths.mjs'
 
 const config = loadConfig()
 const runtimeDir = path.resolve(
   process.env.SERVICE_CONTROL_RUNTIME ||
-  path.join(os.homedir(), 'Library', 'Application Support', 'KMCBServiceControl', 'runtime')
+  defaultRuntimeDir()
 )
 const publicDir = path.join(TOOL_ROOT, 'public')
 const tokenPath = path.join(runtimeDir, 'control-token')

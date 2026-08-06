@@ -1,7 +1,8 @@
-# kmcb-service-control-centre 安装与迁移指南
+# kmcb-service-control-centre macOS 安装与迁移指南
 
 本指南面向第一次在另一台 Mac 上安装 `kmcb-service-control-centre` 的使用者。
 重点是处理不同用户名、不同源码目录、不同业务仓库目录、不同端口和不同 Java 环境带来的差异。
+Windows 使用者请阅读 [Windows 安装与使用指南](setup-guide.windows.zh-CN.md)。
 
 ## 1. 先理解三个不同的位置
 
@@ -33,9 +34,9 @@
 
 ### 2.1 当前支持范围
 
-当前安装脚本和进程管理实现面向 macOS。
-代码依赖 macOS 的 `launchctl`、`lsof`、`ps`、`zsh` 和用户级 LaunchAgent。
-Windows 和 Linux 尚未提供经过验证的安装流程。
+本指南中的安装流程面向 macOS，并使用 `launchctl`、`lsof`、`ps`、`zsh` 和用户级 LaunchAgent。
+项目同时提供 Windows 实现，但 Windows 的安装命令、运行目录和进程归属规则不同，应使用独立 Windows 指南。
+Linux 尚未提供经过验证的安装流程。
 
 ### 2.2 必需软件
 
@@ -199,7 +200,10 @@ test -x scripts/install-launch-agent.sh
 | `protocol` | 是 | `http`、`https` 或 `tcp` |
 | `openUrl` | 否 | 页面打开和 HTTP 健康检查使用的地址 |
 | `command` | 是 | 在 `cwd` 中由 `/bin/zsh -lc` 执行的启动命令 |
-| `env` | 否 | 可以提交的非秘密环境变量 |
+| `commandWindows` | 否 | Windows 专用的 `cmd.exe` 命令，macOS 会忽略 |
+| `env` | 否 | 两个平台共用且可以提交的非秘密环境变量 |
+| `envPosix` | 否 | macOS/POSIX 专用的非秘密环境变量 |
+| `envWindows` | 否 | Windows 专用的非秘密环境变量 |
 
 `id` 和 `port` 在整个文件中必须唯一。
 业务服务的 `port` 也不能与控制中心端口 `17600` 重复。
@@ -670,8 +674,8 @@ git archive --format=zip --output ../kmcb-service-control-centre.zip HEAD
 
 ## 19. 已知限制
 
-- 当前只提供经过验证的 macOS 安装和运行方式。
-- 控制中心端口的安装前检查固定为 `17600`，仅修改 JSON 中的控制中心端口并不足以完成迁移。
+- 本文只描述 macOS，Windows 应使用独立的 Windows 指南。
+- macOS 安装脚本的控制端口预检仍固定为 `17600`，仅修改 JSON 中的控制中心端口并不足以完成 macOS 迁移。
 - `config/services.json` 当前是受 Git 跟踪的机器配置，不同使用者需要自行处理本地路径修改与后续上游更新之间的合并。
 - 仓库不会安装或修复业务项目自身的 Node.js、Java、Maven、数据库或其他依赖。
 - 页面和 API 只应在本机回环地址使用，不支持公开部署、反向代理或隧道暴露。

@@ -1,0 +1,88 @@
+name: Test
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  node:
+    name: Node.js 20 on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - macos-latest
+          - windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Check JavaScript syntax
+        run: npm run check
+
+      - name: Run tests
+        run: npm test
+
+      - name: Parse PowerShell installers
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          $allParseErrors = @()
+          foreach ($scriptPath in @(
+            'scripts/install-windows.ps1',
+            'scripts/uninstall-windows.ps1'
+          )) {
+            $tokens = $null
+            $parseErrors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile(
+              (Resolve-Path $scriptPath),
+              [ref]$tokens,
+              [ref]$parseErrors
+            ) | Out-Null
+            $allParseErrors += $parseErrors
+          }
+          if ($allParseErrors.Count -gt 0) {
+            $allParseErrors | Format-List | Out-String | Write-Error
+            exit 1
+          }
+
+      - name: Smoke-test Windows install, task, CLI, API, and uninstall
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          Set-ExecutionPolicy -Scope Process Bypass -Force
+          $smokeRoot = Join-Path $env:RUNNER_TEMP 'KMCB 控制中心 smoke'
+          $taskName = "KMCBServiceControl-$env:GITHUB_RUN_ID"
+          try {
+            & .\scripts\install-windows.ps1 `
+              -AppRootOverride $smokeRoot `
+              -TaskName $taskName `
+              -SkipPathUpdate
+            if (-not (Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue)) {
+              throw 'The Windows installer did not register its scheduled task.'
+            }
+            & (Join-Path $smokeRoot 'bin\kmcb-svc.cmd') status
+            $status = Invoke-RestMethod http://127.0.0.1:17600/api/status
+            if ($status.services.Count -lt 1) {
+              throw 'The Windows control API returned no registered services.'
+            }
+          } finally {
+            & .\scripts\uninstall-windows.ps1 `
+              -AppRootOverride $smokeRoot `
+              -TaskName $taskName `
+              -SkipPathUpdate
+          }
+          if (Test-Path -LiteralPath $smokeRoot) {
+            throw 'The Windows uninstaller left its temporary application directory behind.'
+          }

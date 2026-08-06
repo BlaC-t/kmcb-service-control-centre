@@ -1,16 +1,15 @@
 #!/usr/bin/env node
 import { spawn } from 'node:child_process'
 import fs from 'node:fs'
-import os from 'node:os'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { loadConfig, TOOL_ROOT } from '../src/config.mjs'
+import { defaultRuntimeDir } from '../src/runtime-paths.mjs'
 
 const config = loadConfig()
 const baseUrl = process.env.SERVICE_CONTROL_URL || `http://${config.host}:${config.port}`
 const runtimeDir = path.resolve(
   process.env.SERVICE_CONTROL_RUNTIME ||
-  path.join(os.homedir(), 'Library', 'Application Support', 'KMCBServiceControl', 'runtime')
+  defaultRuntimeDir()
 )
 const [command = 'status', id] = process.argv.slice(2)
 const commands = new Set(['status', 'start', 'stop', 'restart', 'logs'])

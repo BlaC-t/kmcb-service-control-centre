@@ -2,6 +2,31 @@
 
 ## 2026-08-06
 
+### Added
+
+- Added native Windows service lifecycle support using `cmd.exe`, `netstat.exe`, PowerShell process-tree discovery, and `taskkill.exe`.
+- Added per-platform `commandWindows`, `envPosix`, and `envWindows` registry fields while retaining the existing `command` and common `env` fields.
+- Added PowerShell install and uninstall scripts that use `%LOCALAPPDATA%`, a current-user logon scheduled task, and a user PATH CLI wrapper without requiring administrator elevation.
+- Added a Windows setup, configuration, validation, troubleshooting, upgrade, and uninstall guide.
+- Added macOS and Windows GitHub Actions coverage with PowerShell syntax parsing plus a real Windows install, scheduled-task, CLI, API, and uninstall smoke test in a Unicode path.
+
+### Changed
+
+- Moved runtime-directory selection into a platform-aware helper while preserving the existing macOS Application Support path.
+- Raised the package version to `1.1.0`.
+- Updated the example registry with Windows commands and kept the fixed macOS Java 17 paths in `envPosix` only.
+
+### Security
+
+- Windows only treats listeners inside a recorded managed process tree as controllable; all other listeners are conflicts and cannot be stopped by the control centre.
+- The Windows installer refuses to replace an unrelated process already listening on the configured control port.
+
+### Validation
+
+- `npm run check` completed successfully after the cross-platform changes.
+- All 29 Node.js tests passed, including Windows command selection, runtime paths, listener parsing, process-tree identity, PID-reuse refusal, installer contracts, and the existing HTTP lifecycle integration.
+- Reinstalled the macOS LaunchAgent from version `1.1.0` and confirmed 11 registered services report 8 running, 3 stopped, and no unhealthy or conflicting services.
+
 ### Documentation
 
 - Added a detailed Chinese setup and migration guide for sharing the tool with users whose repository, workspace, runtime, and home-directory paths differ.
@@ -10,7 +35,7 @@
 
 ### Known Limitations
 
-- Documented that macOS is the only verified platform, the installer's control-port preflight is fixed to `17600`, and `config/services.json` remains a Git-tracked machine-specific file.
+- `config/services.json` remains a Git-tracked machine-specific file and must be reconciled when multiple users keep different local paths.
 
 ## 2026-08-04
 
