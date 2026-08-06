@@ -12,15 +12,15 @@ export function defaultAppRoot({
   }
 
   if (platform === 'darwin') {
-    return path.join(home, 'Library', 'Application Support', 'KMCBServiceControl')
+    return path.posix.join(home, 'Library', 'Application Support', 'KMCBServiceControl')
   }
 
-  const dataRoot = env.XDG_DATA_HOME || path.join(home, '.local', 'share')
-  return path.join(dataRoot, 'KMCBServiceControl')
+  const dataRoot = env.XDG_DATA_HOME || path.posix.join(home, '.local', 'share')
+  return path.posix.join(dataRoot, 'KMCBServiceControl')
 }
 
 export function defaultRuntimeDir(options = {}) {
   const platform = options.platform || process.platform
-  const pathApi = platform === 'win32' ? path.win32 : path
+  const pathApi = platform === 'win32' ? path.win32 : path.posix
   return pathApi.join(defaultAppRoot(options), 'runtime')
 }

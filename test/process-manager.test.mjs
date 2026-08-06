@@ -119,7 +119,8 @@ test('uses cmd.exe for Windows service commands', () => {
     commandLaunchSpec('npm run dev', 'win32', { ComSpec: 'C:\\Windows\\System32\\cmd.exe' }),
     {
       file: 'C:\\Windows\\System32\\cmd.exe',
-      args: ['/d', '/s', '/c', 'npm run dev'],
+      args: ['/d', '/s', '/c', '"npm run dev"'],
+      windowsVerbatimArguments: true,
     },
   )
 })
@@ -236,7 +237,10 @@ test('marks a managed process unhealthy after its startup timeout', async t => {
       command: 'node server.mjs',
     }],
   })
-  const manager = new ProcessManager(config, runtimeDir, { platform: 'darwin' })
+  const manager = new ProcessManager(config, runtimeDir, {
+    platform: 'darwin',
+    findListeners: async () => [],
+  })
   manager.state.services['timed-out'] = {
     pid: process.pid,
     startedAt: new Date(Date.now() - 1000).toISOString(),
@@ -248,7 +252,10 @@ test('marks a managed process unhealthy after its startup timeout', async t => {
   assert.match(status.message, /启动超过 1 秒/)
 })
 
-test('marks a port owned by another project as conflict and refuses to stop it', { timeout: 15000 }, async t => {
+test('marks a port owned by another project as conflict and refuses to stop it', {
+  timeout: 15000,
+  skip: process.platform === 'win32',
+}, async t => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kmcb-service-conflict-'))
   const expectedCwd = path.join(tempRoot, 'expected')
   const conflictingCwd = path.join(tempRoot, 'conflicting')

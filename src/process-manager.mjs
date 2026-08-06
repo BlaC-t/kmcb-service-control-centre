@@ -174,6 +174,7 @@ export class ProcessManager extends EventEmitter {
       cwd: service.cwd,
       detached: true,
       windowsHide: true,
+      windowsVerbatimArguments: launch.windowsVerbatimArguments,
       stdio: ['ignore', logFd, logFd],
       env: childEnv,
     })
@@ -335,7 +336,8 @@ export function commandLaunchSpec(command, platform = process.platform, env = pr
   if (platform === 'win32') {
     return {
       file: env.ComSpec || env.COMSPEC || 'cmd.exe',
-      args: ['/d', '/s', '/c', command],
+      args: ['/d', '/s', '/c', `"${command}"`],
+      windowsVerbatimArguments: true,
     }
   }
 
