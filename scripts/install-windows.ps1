@@ -167,7 +167,7 @@ Start-ScheduledTask -TaskName $TaskName
 $Ready = $false
 for ($Attempt = 0; $Attempt -lt 50; $Attempt += 1) {
   try {
-    Invoke-RestMethod -Uri "$ControlUrl/api/status" -TimeoutSec 1 | Out-Null
+    Invoke-WebRequest -Uri $ControlUrl -Method Head -UseBasicParsing -TimeoutSec 2 | Out-Null
     $Ready = $true
     break
   } catch {
