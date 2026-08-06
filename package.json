@@ -6,8 +6,8 @@
   "scripts": {
     "start": "node src/server.mjs",
     "svc": "node bin/svc.mjs",
-    "test": "node --test test/*.test.mjs",
-    "check": "node --check src/config.mjs && node --check src/process-manager.mjs && node --check src/runtime-paths.mjs && node --check src/server.mjs && node --check bin/svc.mjs && node --check public/app.js"
+    "test": "node scripts/run-tests.mjs",
+    "check": "node --check src/config.mjs && node --check src/process-manager.mjs && node --check src/runtime-paths.mjs && node --check src/server.mjs && node --check bin/svc.mjs && node --check scripts/run-tests.mjs && node --check public/app.js"
   },
   "engines": {
     "node": ">=20"
