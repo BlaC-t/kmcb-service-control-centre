@@ -1,5 +1,27 @@
 # Changelog
 
+## 2026-08-10
+
+### Changed
+
+- Changed the mobile H5 launcher to use HBuilderX's official uni-app CLI entry point so bundled compiler plugins are initialized before Vite starts.
+- Raised the package version to `1.1.1`.
+
+### Fixed
+
+- Fixed `mobile-web` SCSS compilation failing with `Preprocessor dependency "sass" not found` even when HBuilderX's `compile-dart-sass` plugin is installed.
+
+### Validation
+
+- `npm run check` completed successfully.
+- All 34 Node.js tests passed, including macOS and Windows launcher argument and compiler-plugin environment coverage.
+- Reinstalled the macOS control centre, restarted `mobile-web`, confirmed it reached `running`, and confirmed `/webapp/App.vue` compiled successfully with HTTP `200` instead of the Sass dependency error.
+
+### Documentation
+
+- Documented that SCSS projects need HBuilderX's `compile-dart-sass` plugin and that the control centre reuses HBuilderX compiler plugins rather than adding them to the mobile repository.
+- Added the same HBuilderX SCSS plugin requirement and restart command to both the macOS and Windows setup guides.
+
 ## 2026-08-06
 
 ### Added

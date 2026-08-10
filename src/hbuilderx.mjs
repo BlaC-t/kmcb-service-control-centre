@@ -37,10 +37,11 @@ export function resolveHBuilderX(options = {}, exists = fs.existsSync) {
       root,
       nodePath: pathApi.join(root, 'plugins', 'node', nodeName),
       modulesPath: pathApi.join(root, 'plugins', 'uniapp-cli-vite', 'node_modules'),
+      uniCliPath: pathApi.join(root, 'plugins', 'uniapp-cli-vite', 'node_modules', '@dcloudio', 'vite-plugin-uni', 'bin', 'uni.js'),
       vitePath: pathApi.join(root, 'plugins', 'uniapp-cli-vite', 'node_modules', 'vite', 'bin', 'vite.js'),
       configPath: pathApi.join(root, 'plugins', 'uniapp-cli-vite', 'vite.config.js'),
     }
-    if (exists(result.nodePath) && exists(result.modulesPath) && exists(result.vitePath) && exists(result.configPath)) return result
+    if (exists(result.nodePath) && exists(result.modulesPath) && exists(result.uniCliPath) && exists(result.configPath)) return result
   }
 
   throw new Error('HBuilderX uni-app compiler was not found. Install HBuilderX or set HBUILDERX_HOME to its application root.')

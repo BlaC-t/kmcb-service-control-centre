@@ -64,6 +64,8 @@ where.exe node
 ```
 
 启动器会使用 HBuilderX 自带的 Node.js、Vite 和 uni-app 编译器。
+启动器会通过 HBuilderX 官方 uni-app CLI 加载已安装的编译插件。
+如果手机项目使用 SCSS，请在 HBuilderX 的“工具 - 插件安装”中确认 `compile-dart-sass` 已安装，再通过 `kmcb-svc restart mobile-web` 重启服务。
 
 ## 3. 获取源码
 

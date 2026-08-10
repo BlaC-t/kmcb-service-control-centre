@@ -75,6 +75,8 @@ Windows runtime 默认位于 `%LOCALAPPDATA%\KMCBServiceControl\runtime`，并�
 
 `mobile-web` 服务会把 `kmcb-mobile` 作为 uni-app H5 项目运行在 `http://127.0.0.1:3400/webapp/`。
 启动器会自动查找标准位置中的 HBuilderX；如果安装在自定义目录，请设置 `HBUILDERX_HOME` 指向 HBuilderX 应用根目录。
+启动器通过 HBuilderX 官方 uni-app CLI 加载 IDE 内置编译插件，不会要求在业务项目中重复安装编译器依赖。
+如果项目使用 SCSS，请先在 HBuilderX 的“工具 - 插件安装”中确认 `compile-dart-sass` 已安装；其他预处理语言也应安装对应的 HBuilderX 编译插件。
 
 后端重启会先执行 Maven 打包，再运行对应可执行 JAR。
 这样可以避免本地 Maven 依赖过期，但首次启动会比前端服务慢。
