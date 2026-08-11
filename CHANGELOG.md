@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-08-11
+
+### Added
+
+- Added the latest status refresh timestamp to every frontend and backend service card.
+
+### Changed
+
+- Raised the package version to `1.1.2`.
+
+### Validation
+
+- `npm run check` completed successfully.
+- All 35 Node.js tests passed, including the per-card refresh timestamp UI contract.
+
 ## 2026-08-10
 
 ### Changed

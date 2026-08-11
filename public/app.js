@@ -69,15 +69,16 @@ function render(payload) {
   document.querySelector('#summary-attention').textContent = summary.conflict + summary.unhealthy
   document.querySelector('#last-check').textContent = new Date(payload.generatedAt).toLocaleTimeString('zh-CN', { hour12: false })
 
-  frontendRoot.innerHTML = payload.services.filter(service => service.group === 'frontend').map(serviceCard).join('')
-  backendRoot.innerHTML = payload.services.filter(service => service.group !== 'frontend').map(serviceCard).join('')
+  frontendRoot.innerHTML = payload.services.filter(service => service.group === 'frontend').map(service => serviceCard(service, payload.generatedAt)).join('')
+  backendRoot.innerHTML = payload.services.filter(service => service.group !== 'frontend').map(service => serviceCard(service, payload.generatedAt)).join('')
 }
 
-function serviceCard(service) {
+function serviceCard(service, refreshedAt) {
   const canStart = service.controllable && !service.busy && service.state === 'stopped'
   const canStop = service.controllable && !service.busy && ['running', 'unhealthy', 'starting'].includes(service.state)
   const canRestart = service.controllable && !service.busy && ['running', 'unhealthy'].includes(service.state)
   const source = sourceLabels[service.source] || '未运行'
+  const refreshTime = formatRefreshTime(refreshedAt)
   const health = service.health
     ? `${service.health.statusCode || '--'}${service.health.latencyMs != null ? ` · ${service.health.latencyMs}ms` : ''}`
     : '--'
@@ -98,6 +99,7 @@ function serviceCard(service) {
         <div class="meta-row"><span>服务</span><span>${escapeHtml(service.name)}</span></div>
         <div class="meta-row"><span>目录</span><span title="${escapeHtml(service.cwd)}">${escapeHtml(service.cwdLabel)}</span></div>
         <div class="meta-row"><span>HTTP</span><span>${escapeHtml(health)}</span></div>
+        <div class="meta-row"><span>上次刷新</span><span><time datetime="${escapeHtml(refreshedAt)}">${escapeHtml(refreshTime)}</time></span></div>
       </div>
       <p class="message">${escapeHtml(service.message || '')}</p>
       <div class="card-actions">
@@ -109,6 +111,20 @@ function serviceCard(service) {
       </div>
     </article>
   `
+}
+
+function formatRefreshTime(value) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '--'
+  return date.toLocaleString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  })
 }
 
 async function runAction(id, action, button) {
