@@ -27,6 +27,10 @@ export class ProcessManager extends EventEmitter {
     this.locks = new Map()
     fs.mkdirSync(this.logsDir, { recursive: true })
     this.state = readJson(this.statePath, { services: {} })
+    this.state.lastStartedAt ||= {}
+    for (const [id, managed] of Object.entries(this.state.services)) {
+      if (managed.startedAt && !this.state.lastStartedAt[id]) this.state.lastStartedAt[id] = managed.startedAt
+    }
   }
 
   async statuses() {
@@ -85,6 +89,7 @@ export class ProcessManager extends EventEmitter {
         state: health.ok ? 'running' : 'unhealthy',
         pid: listener.pid,
         source: managedAlive ? 'managed' : 'external',
+        startedAt: managedAlive ? managed.startedAt : null,
         processCwd: listener.cwd,
         command: listener.command,
         health,
@@ -100,6 +105,7 @@ export class ProcessManager extends EventEmitter {
         state: startupTimedOut ? 'unhealthy' : 'starting',
         pid: managed.pid,
         source: 'managed',
+        startedAt: managed.startedAt,
         processCwd: service.cwd,
         command: service.command,
         message: startupTimedOut
@@ -117,6 +123,7 @@ export class ProcessManager extends EventEmitter {
       state: 'stopped',
       pid: null,
       source: null,
+      startedAt: this.state.lastStartedAt[id] || null,
       processCwd: null,
       command: null,
       message: fs.existsSync(service.cwd) ? '服务未运行' : '项目目录不存在',
@@ -183,11 +190,13 @@ export class ProcessManager extends EventEmitter {
     child.unref()
     fs.closeSync(logFd)
 
+    const startedAt = new Date().toISOString()
     this.state.services[id] = {
       pid: child.pid,
-      startedAt: new Date().toISOString(),
+      startedAt,
       command: service.command,
     }
+    this.state.lastStartedAt[id] = startedAt
     this.persistState()
     await delay(350)
     return this.status(id)
@@ -584,6 +593,7 @@ function serviceStatus(service, details) {
     controllable: details.controllable !== false && details.state !== 'conflict',
     busy: false,
     health: details.health || null,
+    startedAt: details.startedAt ?? null,
     ...details,
   }
 }

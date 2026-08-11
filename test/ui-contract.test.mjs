@@ -14,8 +14,9 @@ test('uses project names as service card titles', () => {
   assert.match(app, /<span>\$\{escapeHtml\(service\.description\)\}<\/span>/)
 })
 
-test('shows the status snapshot refresh time on every service card', () => {
-  assert.match(app, /serviceCard\(service, payload\.generatedAt\)/)
-  assert.match(app, /<span>上次刷新<\/span><span><time datetime="\$\{escapeHtml\(refreshedAt\)\}">\$\{escapeHtml\(refreshTime\)\}<\/time><\/span>/)
+test('shows each service own latest start time on its card', () => {
+  assert.doesNotMatch(app, /serviceCard\(service, payload\.generatedAt\)/)
+  assert.match(app, /<span>上次启动<\/span><span><time datetime="\$\{escapeHtml\(service\.startedAt \|\| ''\)\}">\$\{escapeHtml\(startedTime\)\}<\/time><\/span>/)
+  assert.match(app, /formatServiceTime\(service\.startedAt\)/)
   assert.match(app, /date\.toLocaleString\('zh-CN'/)
 })

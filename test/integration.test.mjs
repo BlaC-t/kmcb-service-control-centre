@@ -75,11 +75,16 @@ test('starts, restarts, logs, and stops a registered service through the HTTP AP
   await mutate(controlPort, token, 'start')
   status = await waitForStatus(controlPort, 'running')
   const firstPid = status.pid
+  const firstStartedAt = status.startedAt
   assert.equal(status.source, 'managed')
+  assert.match(firstStartedAt, /^\d{4}-\d{2}-\d{2}T/)
+  assert.equal((await statusFor(controlPort)).startedAt, firstStartedAt)
 
   await mutate(controlPort, token, 'restart')
   status = await waitForStatus(controlPort, 'running')
   assert.notEqual(status.pid, firstPid)
+  assert.notEqual(status.startedAt, firstStartedAt)
+  const secondStartedAt = status.startedAt
 
   const logs = await (await fetch(`http://127.0.0.1:${controlPort}/api/services/fixture/logs`)).json()
   assert.match(logs.logs, /starting fixture/)
@@ -87,6 +92,7 @@ test('starts, restarts, logs, and stops a registered service through the HTTP AP
   await mutate(controlPort, token, 'stop')
   status = await waitForStatus(controlPort, 'stopped')
   assert.equal(status.pid, null)
+  assert.equal(status.startedAt, secondStartedAt)
 })
 
 async function mutate(controlPort, token, action) {

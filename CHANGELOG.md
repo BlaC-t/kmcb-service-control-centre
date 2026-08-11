@@ -4,16 +4,20 @@
 
 ### Added
 
-- Added the latest status refresh timestamp to every frontend and backend service card.
+- Added each managed service's latest start or restart timestamp to every frontend and backend service card.
 
 ### Changed
 
-- Raised the package version to `1.1.2`.
+- Raised the package version to `1.1.3`.
+
+### Fixed
+
+- Corrected the per-card timestamp to use the service's persisted `startedAt` value instead of the Dashboard status snapshot time.
 
 ### Validation
 
 - `npm run check` completed successfully.
-- All 35 Node.js tests passed, including the per-card refresh timestamp UI contract.
+- All 35 Node.js tests passed, including service start-time persistence across status polling and stop operations plus updates after restart.
 
 ## 2026-08-10
 
