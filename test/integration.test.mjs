@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url'
 
 const toolRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
-test('starts, restarts, logs, and stops a registered service through the HTTP API', { timeout: 30000 }, async t => {
+test('starts, restarts, logs, and stops a registered service through the HTTP API', { timeout: 60000 }, async t => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kmcb-service-control-'))
   const runtimeDir = path.join(tempRoot, 'runtime')
   const controlPort = await freePort()

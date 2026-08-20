@@ -25,6 +25,7 @@
 - Reinstalled the macOS control centre, applied `127.0.0.1` to the real Mobile and Trace frontends, and confirmed both restarted as healthy HTTP `200` services.
 - Confirmed the real Mobile listener received `VITE_API_BASE_URL=http://127.0.0.1:7110` and the Trace listener received both configured proxy environment variables.
 - `kmcb-trace-web` completed `npm run check`, all 27 tests, and `npm run build`, while the restarted HBuilderX Mobile service compiled and served `/webapp/` successfully.
+- Increased the cross-platform HTTP lifecycle test budget to cover the additional real restart on slower Windows CI process inspection.
 
 ## 2026-08-11
 
