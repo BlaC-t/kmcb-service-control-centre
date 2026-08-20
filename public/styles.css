@@ -34,12 +34,16 @@ body {
 }
 
 button,
-a {
+a,
+input,
+select {
   font: inherit;
 }
 
 button:focus-visible,
-a:focus-visible {
+a:focus-visible,
+input:focus-visible,
+select:focus-visible {
   outline: 2px solid var(--red);
   outline-offset: 2px;
 }
@@ -415,6 +419,58 @@ h1 {
   min-height: 18px;
   color: var(--muted);
   font-size: 11px;
+}
+
+.backend-target {
+  margin: 2px 0 12px;
+  padding: 11px;
+  border: 1px solid rgba(98, 181, 209, 0.22);
+  background: rgba(98, 181, 209, 0.05);
+}
+
+.backend-target-title,
+.backend-target-row {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.backend-target-title {
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--muted);
+  font: 600 9px/1.4 var(--mono);
+  letter-spacing: 0.1em;
+}
+
+.backend-target-title code {
+  overflow: hidden;
+  color: var(--blue);
+  text-overflow: ellipsis;
+}
+
+.backend-target-row {
+  gap: 7px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.backend-target input,
+.backend-target select {
+  min-width: 0;
+  min-height: 36px;
+  flex: 1 1 170px;
+  padding: 7px 9px;
+  border: 1px solid var(--line-strong);
+  border-radius: 0;
+  background: #0d1116;
+  color: var(--text);
+  font: 500 11px/1 var(--mono);
+}
+
+.backend-target-row .button {
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 .card-actions {

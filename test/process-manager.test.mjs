@@ -11,6 +11,7 @@ import {
   commandLaunchSpec,
   descendantProcessIds,
   loadServiceSecretEnv,
+  normalizeBackendHost,
   parseWindowsNetstat,
   ProcessManager,
   windowsCreationTimeMs,
@@ -141,6 +142,69 @@ test('prepends envWindows JAVA_HOME to the Windows child PATH', () => {
   assert.equal(env.SERVICE_CONTROL_ID, 'java-service')
   assert.equal(env.SERVICE_CONTROL_PORT, '8080')
   assert.match(env.SERVICE_CONTROL_ROOT, /kmcb-service-control-centre$/)
+})
+
+test('applies the selected backend environment after service and secret values', () => {
+  const env = buildServiceEnvironment({
+    baseEnv: { VITE_API_BASE_URL: 'http://base:7110' },
+    serviceEnv: { VITE_API_BASE_URL: 'http://service:7110' },
+    secretEnv: { VITE_API_BASE_URL: 'http://secret:7110' },
+    runtimeEnv: { VITE_API_BASE_URL: 'http://192.168.1.44:7110' },
+    id: 'frontend',
+    port: 3400,
+  })
+
+  assert.equal(env.VITE_API_BASE_URL, 'http://192.168.1.44:7110')
+  assert.equal(normalizeBackendHost(' 192.168.1.44 '), '192.168.1.44')
+  assert.throws(() => normalizeBackendHost('localhost'), /valid IPv4 address/)
+})
+
+test('replaces differently cased backend environment keys on Windows', () => {
+  const env = buildServiceEnvironment({
+    baseEnv: { vite_api_base_url: 'http://base:7110' },
+    serviceEnv: { VITE_API_BASE_URL: 'http://service:7110' },
+    runtimeEnv: { Vite_Api_Base_Url: 'http://192.168.1.44:7110' },
+    id: 'frontend',
+    port: 3400,
+    platform: 'win32',
+  })
+  const matchingKeys = Object.keys(env).filter(key => key.toLowerCase() === 'vite_api_base_url')
+
+  assert.deepEqual(matchingKeys, ['Vite_Api_Base_Url'])
+  assert.equal(env.Vite_Api_Base_Url, 'http://192.168.1.44:7110')
+})
+
+test('persists saved and selected backend hosts across manager reloads', t => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kmcb-service-backend-target-'))
+  const runtimeDir = path.join(tempRoot, 'runtime')
+  t.after(() => fs.rmSync(tempRoot, { recursive: true, force: true }))
+  const config = validateConfig({
+    host: '127.0.0.1',
+    port: 17600,
+    workspaceRoot: tempRoot,
+    services: [{
+      id: 'frontend',
+      group: 'frontend',
+      cwd: '.',
+      port: 17601,
+      command: 'node server.mjs',
+      backendTarget: {
+        defaultHost: '127.0.0.1',
+        envTemplates: { VITE_API_BASE_URL: 'http://{host}:7110' },
+      },
+    }],
+  })
+
+  const manager = new ProcessManager(config, runtimeDir)
+  manager.addBackendHost('frontend', '192.168.1.44')
+  manager.selectBackendHost('frontend', '192.168.1.44')
+
+  const reloaded = new ProcessManager(config, runtimeDir)
+  assert.deepEqual(reloaded.backendTargetStatus(config.services[0]), {
+    defaultHost: '127.0.0.1',
+    selectedHost: '192.168.1.44',
+    hosts: ['127.0.0.1', '192.168.1.44'],
+  })
 })
 
 test('controls only a listener inside its managed Windows process tree', async t => {

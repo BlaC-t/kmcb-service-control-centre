@@ -20,3 +20,11 @@ test('shows each service own latest start time on its card', () => {
   assert.match(app, /formatServiceTime\(service\.startedAt\)/)
   assert.match(app, /date\.toLocaleString\('zh-CN'/)
 })
+
+test('offers saved backend IPv4 selection and apply-restart controls on frontend cards', () => {
+  assert.match(app, /data-action="backend-add"/)
+  assert.match(app, /data-action="backend-apply"/)
+  assert.match(app, /应用并重启/)
+  assert.match(app, /target\.activeHost/)
+  assert.match(app, /127\.0\.0\.1|本机/)
+})

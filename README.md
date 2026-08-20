@@ -7,6 +7,7 @@
 
 - 实时查看所有注册服务的端口、PID、运行状态和健康状态。
 - 在每张服务卡片中显示该服务自身最近一次由控制中心启动或重启的时间。
+- 在每个前端服务卡片中保存、选择并应用后端 IPv4 地址，默认使用 `127.0.0.1`，运行中的前端会在应用后自动重启。
 - 在 macOS 上识别工作目录匹配的外部进程，在 Windows 上安全管理控制中心启动的进程树，并拒绝控制归属不明的端口占用。
 - 从一个页面启动、停止和重启服务。
 - 查看每个服务最近的启动和运行日志。
@@ -65,6 +66,20 @@ kmcb-svc logs stm-gk-board
 新增服务时必须使用唯一的 `id` 和 `port`，并填写项目工作目录。
 `command` 是 macOS/POSIX 命令，`commandWindows` 可以提供 Windows `cmd.exe` 命令。
 公共环境变量使用 `env`，平台专用环境变量使用 `envPosix` 或 `envWindows`。
+前端服务可以使用 `backendTarget` 声明后端地址模板。
+`defaultHost` 必须是 IPv4 地址，`envTemplates` 的每个值都必须包含 `{host}`，控制中心会在启动前把页面选择的 IP 写入这些环境变量。
+页面添加过的 IP、当前选择和服务状态一起保存在本机运行目录，不会提交到 Git，也不会同步给其他使用者。
+运行中的前端点击“应用并重启”后立即使用新地址；已停止的前端会保存选择，并在下次启动时使用。
+
+```json
+"backendTarget": {
+  "defaultHost": "127.0.0.1",
+  "envTemplates": {
+    "VITE_API_BASE_URL": "http://{host}:7110"
+  }
+}
+```
+
 CRM API 和 CRM 客户网关固定使用项目要求的 Temurin Java 17，避免系统 Maven 默认 JDK 变化导致 Lombok 注解处理失败。
 控制页面将两个 CRM 模块分别标记为 `kj-crm-api / StartApp / :7110` 和 `kj-crm-gateway-api / StartAppGateWay / :7111`，对应 IntelliJ 中的两个 Spring Boot 启动入口。
 

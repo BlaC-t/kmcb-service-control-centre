@@ -1,4 +1,5 @@
 import fs from 'node:fs'
+import net from 'node:net'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -55,12 +56,13 @@ export function validateConfig(raw, { platform = process.platform } = {}) {
 
     const cwdLabel = path.relative(workspaceRoot, cwd) || '.'
 
+    const group = String(service.group || 'other')
     return {
       id,
       name: String(service.name || id),
       description: String(service.description || ''),
       projectName: String(service.projectName || cwdLabel.split(path.sep)[0] || id),
-      group: String(service.group || 'other'),
+      group,
       cwd,
       cwdLabel,
       port: servicePort,
@@ -71,6 +73,7 @@ export function validateConfig(raw, { platform = process.platform } = {}) {
         ...normalizeEnv(service.env),
         ...normalizeEnv(platformEnv),
       },
+      backendTarget: normalizeBackendTarget(service.backendTarget, group, id),
     }
   })
 
@@ -95,6 +98,25 @@ export function normalizeCommand(value, platform = process.platform) {
 function normalizeEnv(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
   return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, String(item)]))
+}
+
+function normalizeBackendTarget(value, group, id) {
+  if (value == null) return null
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error(`${id} backendTarget must be an object.`)
+  }
+  if (group !== 'frontend') throw new Error(`${id} backendTarget is only supported for frontend services.`)
+
+  const defaultHost = String(value.defaultHost || '127.0.0.1').trim()
+  if (!net.isIPv4(defaultHost)) throw new Error(`${id} backendTarget.defaultHost must be an IPv4 address.`)
+  const envTemplates = normalizeEnv(value.envTemplates)
+  if (!Object.keys(envTemplates).length) throw new Error(`${id} backendTarget.envTemplates is required.`)
+  for (const [key, template] of Object.entries(envTemplates)) {
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) throw new Error(`${id} backendTarget environment key is invalid: ${key}`)
+    if (!template.includes('{host}')) throw new Error(`${id} backendTarget template ${key} must include {host}.`)
+  }
+
+  return { defaultHost, envTemplates }
 }
 
 function positiveInteger(value, fallback) {

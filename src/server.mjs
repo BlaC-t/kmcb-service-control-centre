@@ -44,6 +44,24 @@ const server = http.createServer(async (request, response) => {
       return json(response, 200, { id: logsMatch[1], logs: manager.logs(logsMatch[1], Number(url.searchParams.get('lines') || 200)) })
     }
 
+    const backendHostsMatch = url.pathname.match(/^\/api\/services\/([a-z0-9-]+)\/backend-hosts$/)
+    if (request.method === 'POST' && backendHostsMatch) {
+      authorizeMutation(request, token, config)
+      const body = await readJsonBody(request)
+      const backendTarget = manager.addBackendHost(backendHostsMatch[1], body.host)
+      await broadcastStatus()
+      return json(response, 200, { ok: true, backendTarget })
+    }
+
+    const backendTargetMatch = url.pathname.match(/^\/api\/services\/([a-z0-9-]+)\/backend-target$/)
+    if (request.method === 'POST' && backendTargetMatch) {
+      authorizeMutation(request, token, config)
+      const body = await readJsonBody(request)
+      const result = await manager.applyBackendHost(backendTargetMatch[1], body.host)
+      await broadcastStatus()
+      return json(response, 200, { ok: true, ...result })
+    }
+
     const actionMatch = url.pathname.match(/^\/api\/services\/([a-z0-9-]+)\/(start|stop|restart)$/)
     if (request.method === 'POST' && actionMatch) {
       authorizeMutation(request, token, config)
@@ -147,6 +165,28 @@ function json(response, status, value) {
     'Cache-Control': 'no-store',
   })
   response.end(body)
+}
+
+async function readJsonBody(request) {
+  const chunks = []
+  let size = 0
+  for await (const chunk of request) {
+    size += chunk.length
+    if (size > 16 * 1024) {
+      const error = new Error('Request body is too large.')
+      error.statusCode = 413
+      throw error
+    }
+    chunks.push(chunk)
+  }
+  if (!chunks.length) return {}
+  try {
+    return JSON.parse(Buffer.concat(chunks).toString('utf8'))
+  } catch {
+    const error = new Error('Request body must be valid JSON.')
+    error.statusCode = 400
+    throw error
+  }
 }
 
 function setSecurityHeaders(response) {

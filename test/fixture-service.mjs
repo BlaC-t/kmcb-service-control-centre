@@ -5,7 +5,11 @@ if (!Number.isInteger(port)) throw new Error('A fixture port is required.')
 
 const server = http.createServer((request, response) => {
   response.writeHead(200, { 'Content-Type': 'application/json' })
-  response.end(JSON.stringify({ ok: true, pid: process.pid }))
+  response.end(JSON.stringify({
+    ok: true,
+    pid: process.pid,
+    backendUrl: process.env.TEST_BACKEND_URL || null,
+  }))
 })
 
 server.listen(port, '127.0.0.1')

@@ -3,6 +3,7 @@ import { execFile, spawn } from 'node:child_process'
 import fs from 'node:fs'
 import http from 'node:http'
 import https from 'node:https'
+import net from 'node:net'
 import path from 'node:path'
 import { promisify } from 'node:util'
 import { fileURLToPath } from 'node:url'
@@ -27,7 +28,9 @@ export class ProcessManager extends EventEmitter {
     this.locks = new Map()
     fs.mkdirSync(this.logsDir, { recursive: true })
     this.state = readJson(this.statePath, { services: {} })
+    this.state.services ||= {}
     this.state.lastStartedAt ||= {}
+    this.state.backendTargets ||= {}
     for (const [id, managed] of Object.entries(this.state.services)) {
       if (managed.startedAt && !this.state.lastStartedAt[id]) this.state.lastStartedAt[id] = managed.startedAt
     }
@@ -70,7 +73,7 @@ export class ProcessManager extends EventEmitter {
     }
 
     if (conflicts.length && !matching.length) {
-      return serviceStatus(service, {
+      return this.serviceStatus(service, {
         state: 'conflict',
         pid: conflicts[0].pid,
         source: 'external',
@@ -85,7 +88,7 @@ export class ProcessManager extends EventEmitter {
       const health = service.protocol === 'tcp'
         ? { ok: true, latencyMs: null, statusCode: null }
         : await checkHttp(service)
-      return serviceStatus(service, {
+      return this.serviceStatus(service, {
         state: health.ok ? 'running' : 'unhealthy',
         pid: listener.pid,
         source: managedAlive ? 'managed' : 'external',
@@ -101,7 +104,7 @@ export class ProcessManager extends EventEmitter {
       const startedAt = Date.parse(managed.startedAt)
       const startupTimedOut = Number.isFinite(startedAt)
         && Date.now() - startedAt >= this.config.startupTimeoutMs
-      return serviceStatus(service, {
+      return this.serviceStatus(service, {
         state: startupTimedOut ? 'unhealthy' : 'starting',
         pid: managed.pid,
         source: 'managed',
@@ -119,7 +122,7 @@ export class ProcessManager extends EventEmitter {
       this.persistState()
     }
 
-    return serviceStatus(service, {
+    return this.serviceStatus(service, {
       state: 'stopped',
       pid: null,
       source: null,
@@ -157,6 +160,79 @@ export class ProcessManager extends EventEmitter {
     return this.start(id)
   }
 
+  addBackendHost(id, host) {
+    const service = this.getService(id)
+    this.requireBackendTarget(service)
+    const normalizedHost = normalizeBackendHost(host)
+    const target = this.backendTargetStatus(service)
+    const hosts = [...new Set([...target.hosts, normalizedHost])]
+    this.state.backendTargets[id] = { selectedHost: target.selectedHost, hosts }
+    this.persistState()
+    return this.backendTargetStatus(service)
+  }
+
+  selectBackendHost(id, host) {
+    const service = this.getService(id)
+    this.requireBackendTarget(service)
+    const normalizedHost = normalizeBackendHost(host)
+    const target = this.backendTargetStatus(service)
+    const hosts = [...new Set([...target.hosts, normalizedHost])]
+    this.state.backendTargets[id] = { selectedHost: normalizedHost, hosts }
+    this.persistState()
+    return this.backendTargetStatus(service)
+  }
+
+  async applyBackendHost(id, host) {
+    if (this.locks.has(id)) throw new Error(`${id} already has an action in progress.`)
+    const current = await this.status(id)
+    if (this.locks.has(id)) throw new Error(`${id} already has an action in progress.`)
+    const backendTarget = this.selectBackendHost(id, host)
+    const shouldRestart = ['running', 'starting', 'unhealthy'].includes(current.state)
+    const service = shouldRestart
+      ? await this.action(id, 'restart')
+      : await this.status(id)
+    return { backendTarget, service, restarted: shouldRestart }
+  }
+
+  backendTargetStatus(service) {
+    if (!service.backendTarget) return null
+    const stored = this.state.backendTargets[service.id] || {}
+    const savedHosts = Array.isArray(stored.hosts)
+      ? stored.hosts.map(value => String(value).trim()).filter(value => net.isIPv4(value))
+      : []
+    const hosts = [...new Set([service.backendTarget.defaultHost, ...savedHosts])]
+    const selectedHost = hosts.includes(stored.selectedHost)
+      ? stored.selectedHost
+      : service.backendTarget.defaultHost
+    return { defaultHost: service.backendTarget.defaultHost, selectedHost, hosts }
+  }
+
+  backendTargetEnvironment(service) {
+    const target = this.backendTargetStatus(service)
+    if (!target) return {}
+    return Object.fromEntries(Object.entries(service.backendTarget.envTemplates).map(([key, template]) => [
+      key,
+      template.replaceAll('{host}', target.selectedHost),
+    ]))
+  }
+
+  requireBackendTarget(service) {
+    if (!service.backendTarget) throw new Error(`${service.id} does not support backend IP selection.`)
+  }
+
+  serviceStatus(service, details) {
+    const backendTarget = this.backendTargetStatus(service)
+    if (backendTarget) {
+      backendTarget.activeHost = details.source === 'managed'
+        ? this.state.services[service.id]?.backendHost || null
+        : null
+    }
+    return serviceStatus(service, {
+      backendTarget,
+      ...details,
+    })
+  }
+
   async start(id) {
     const service = this.getService(id)
     const current = await this.status(id)
@@ -170,11 +246,13 @@ export class ProcessManager extends EventEmitter {
     fs.appendFileSync(logPath, `\n[control] ${new Date().toISOString()} starting ${id}\n$ ${service.command}\n`)
     const secretEnv = loadServiceSecretEnv(this.runtimeDir, service.id, this.platform)
 
+    const backendTarget = this.backendTargetStatus(service)
     const launch = commandLaunchSpec(service.command, this.platform)
     const childEnv = buildServiceEnvironment({
       baseEnv: process.env,
       serviceEnv: service.env,
       secretEnv,
+      runtimeEnv: this.backendTargetEnvironment(service),
       id,
       port: service.port,
       platform: this.platform,
@@ -195,6 +273,7 @@ export class ProcessManager extends EventEmitter {
       pid: child.pid,
       startedAt,
       command: service.command,
+      backendHost: backendTarget?.selectedHost || null,
     }
     this.state.lastStartedAt[id] = startedAt
     this.persistState()
@@ -359,11 +438,12 @@ export function buildServiceEnvironment({
   baseEnv = process.env,
   serviceEnv = {},
   secretEnv = {},
+  runtimeEnv = {},
   id,
   port,
   platform = process.platform,
 }) {
-  const sources = [baseEnv, serviceEnv, secretEnv]
+  const sources = [baseEnv, serviceEnv, secretEnv, runtimeEnv]
   const result = {}
 
   for (const source of sources) {
@@ -392,6 +472,12 @@ export function buildServiceEnvironment({
   }
 
   return result
+}
+
+export function normalizeBackendHost(value) {
+  const host = String(value || '').trim()
+  if (!net.isIPv4(host)) throw new Error('Backend address must be a valid IPv4 address.')
+  return host
 }
 
 export function parseWindowsNetstat(stdout, port) {

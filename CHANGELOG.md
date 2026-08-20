@@ -1,5 +1,31 @@
 # Changelog
 
+## 2026-08-20
+
+### Added
+
+- Added localhost-first backend IPv4 lists to every frontend service card, with local persistence, saved-address selection, and an apply-and-restart action.
+- Added registry-driven backend environment templates for Admin, Mobile, Customer Portal, STM-GK, Official Site, and Trace frontends.
+- Added authenticated APIs for saving and applying frontend backend addresses.
+
+### Changed
+
+- Raised the package version to `1.2.0`.
+- Made runtime-selected backend variables override static service and secret environment values so the page selection is the effective launch configuration.
+- Distinguished the selected backend from the backend host actually injected into the currently managed process.
+
+### Documentation
+
+- Documented backend target registry templates and the macOS and Windows workflows for connecting a frontend to a colleague's backend.
+
+### Validation
+
+- `npm run check` completed successfully.
+- All 41 Node.js tests passed, including address validation, authenticated add/apply APIs, macOS and Windows environment precedence, automatic restart, active-host reporting, and persistence across manager reloads.
+- Reinstalled the macOS control centre, applied `127.0.0.1` to the real Mobile and Trace frontends, and confirmed both restarted as healthy HTTP `200` services.
+- Confirmed the real Mobile listener received `VITE_API_BASE_URL=http://127.0.0.1:7110` and the Trace listener received both configured proxy environment variables.
+- `kmcb-trace-web` completed `npm run check`, all 27 tests, and `npm run build`, while the restarted HBuilderX Mobile service compiled and served `/webapp/` successfully.
+
 ## 2026-08-11
 
 ### Added

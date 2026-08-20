@@ -96,6 +96,48 @@ test('registers the mobile uni-app H5 frontend on its fixed port', () => {
   assert.match(mobileWeb?.commandWindows || '', /uniapp-h5\.mjs/)
 })
 
+test('registers a localhost-first backend target for every frontend service', () => {
+  const config = validateConfig(registry, { platform: 'darwin' })
+  const frontends = config.services.filter(service => service.group === 'frontend')
+
+  assert.equal(frontends.length, 6)
+  for (const service of frontends) {
+    assert.equal(service.backendTarget?.defaultHost, '127.0.0.1', `${service.id} must default to localhost`)
+    assert.ok(Object.keys(service.backendTarget?.envTemplates || {}).length, `${service.id} must declare backend environment templates`)
+  }
+})
+
+test('validates frontend backend target addresses and templates', () => {
+  const frontend = {
+    ...base.services[0],
+    group: 'frontend',
+    backendTarget: {
+      defaultHost: '127.0.0.1',
+      envTemplates: { VITE_API_BASE_URL: 'http://{host}:7110' },
+    },
+  }
+  const config = validateConfig({ ...base, services: [frontend] })
+  assert.deepEqual(config.services[0].backendTarget, frontend.backendTarget)
+
+  assert.throws(
+    () => validateConfig({
+      ...base,
+      services: [{ ...frontend, backendTarget: { ...frontend.backendTarget, defaultHost: 'localhost' } }],
+    }),
+    /must be an IPv4 address/,
+  )
+  assert.throws(
+    () => validateConfig({
+      ...base,
+      services: [{
+        ...frontend,
+        backendTarget: { ...frontend.backendTarget, envTemplates: { VITE_API_BASE_URL: 'http://localhost:7110' } },
+      }],
+    }),
+    /must include \{host\}/,
+  )
+})
+
 test('starts CRM services with the project Java 17 runtime', () => {
   const config = validateConfig(registry, { platform: 'darwin' })
   for (const id of ['crm-api', 'crm-gateway']) {

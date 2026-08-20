@@ -21,11 +21,14 @@ const refreshLogButton = document.querySelector('#refresh-log')
 const toast = document.querySelector('#toast')
 let currentLogService = null
 let toastTimer = null
+const backendDrafts = new Map()
 
 refreshButton.addEventListener('click', refresh)
 document.querySelector('#close-log').addEventListener('click', () => dialog.close())
 document.querySelector('#close-log-bottom').addEventListener('click', () => dialog.close())
 refreshLogButton.addEventListener('click', () => currentLogService && loadLogs(currentLogService))
+frontendRoot.addEventListener('input', rememberBackendDraft)
+frontendRoot.addEventListener('change', rememberBackendDraft)
 
 for (const root of [frontendRoot, backendRoot]) {
   root.addEventListener('click', async event => {
@@ -33,6 +36,9 @@ for (const root of [frontendRoot, backendRoot]) {
     if (!button) return
     const { action, id, name } = button.dataset
     if (action === 'logs') return openLogs(id, name)
+    if (action === 'backend-add' || action === 'backend-apply') {
+      return runBackendAction(id, name, action, button)
+    }
     if (action === 'stop' || action === 'restart') {
       const verb = action === 'stop' ? '停止' : '重启'
       if (!window.confirm(`确认${verb}「${name}」？`)) return
@@ -79,6 +85,7 @@ function serviceCard(service) {
   const canRestart = service.controllable && !service.busy && ['running', 'unhealthy'].includes(service.state)
   const source = sourceLabels[service.source] || '未运行'
   const startedTime = formatServiceTime(service.startedAt)
+  const backendControls = backendTargetControls(service)
   const health = service.health
     ? `${service.health.statusCode || '--'}${service.health.latencyMs != null ? ` · ${service.health.latencyMs}ms` : ''}`
     : '--'
@@ -101,6 +108,7 @@ function serviceCard(service) {
         <div class="meta-row"><span>HTTP</span><span>${escapeHtml(health)}</span></div>
         <div class="meta-row"><span>上次启动</span><span><time datetime="${escapeHtml(service.startedAt || '')}">${escapeHtml(startedTime)}</time></span></div>
       </div>
+      ${backendControls}
       <p class="message">${escapeHtml(service.message || '')}</p>
       <div class="card-actions">
         <button class="button" data-action="start" data-id="${service.id}" data-name="${escapeHtml(service.name)}" ${canStart ? '' : 'disabled'}>启动</button>
@@ -111,6 +119,83 @@ function serviceCard(service) {
       </div>
     </article>
   `
+}
+
+function backendTargetControls(service) {
+  const target = service.backendTarget
+  if (!target) return ''
+  const draft = backendDrafts.get(service.id) || {}
+  const selectedHost = target.hosts.includes(draft.selectedHost) ? draft.selectedHost : target.selectedHost
+  const newHost = draft.newHost || ''
+  const targetStatus = target.activeHost
+    ? `已生效 ${target.activeHost}`
+    : ['running', 'starting', 'unhealthy'].includes(service.state)
+      ? '等待应用'
+      : `下次启动 ${target.selectedHost}`
+  const options = target.hosts.map(host => `
+    <option value="${escapeHtml(host)}" ${host === selectedHost ? 'selected' : ''}>${escapeHtml(host)}${host === target.defaultHost ? '（本机）' : ''}</option>
+  `).join('')
+  return `
+    <section class="backend-target" aria-label="${escapeHtml(service.name)} 后端连接">
+      <div class="backend-target-title">
+        <span>后端连接 BACKEND</span>
+        <code>${escapeHtml(targetStatus)}</code>
+      </div>
+      <div class="backend-target-row">
+        <select data-backend-select="${escapeHtml(service.id)}" aria-label="选择后端 IP">${options}</select>
+        <button class="button secondary" data-action="backend-apply" data-id="${escapeHtml(service.id)}" data-name="${escapeHtml(service.name)}" ${service.busy ? 'disabled' : ''}>应用并重启</button>
+      </div>
+      <div class="backend-target-row">
+        <input data-backend-input="${escapeHtml(service.id)}" inputmode="decimal" autocomplete="off" placeholder="例如 192.168.1.20" value="${escapeHtml(newHost)}" aria-label="添加后端 IPv4 地址" />
+        <button class="button secondary" data-action="backend-add" data-id="${escapeHtml(service.id)}" data-name="${escapeHtml(service.name)}" ${service.busy ? 'disabled' : ''}>添加 IP</button>
+      </div>
+    </section>
+  `
+}
+
+function rememberBackendDraft(event) {
+  const id = event.target.dataset.backendSelect || event.target.dataset.backendInput
+  if (!id) return
+  const draft = backendDrafts.get(id) || {}
+  if (event.target.dataset.backendSelect) draft.selectedHost = event.target.value
+  if (event.target.dataset.backendInput) draft.newHost = event.target.value
+  backendDrafts.set(id, draft)
+}
+
+async function runBackendAction(id, name, action, button) {
+  const card = button.closest('.service-card')
+  const select = card?.querySelector(`[data-backend-select="${id}"]`)
+  const input = card?.querySelector(`[data-backend-input="${id}"]`)
+  const host = action === 'backend-add' ? input?.value.trim() : select?.value
+  if (!host) return showToast('请输入后端 IPv4 地址', true)
+  if (action === 'backend-apply' && ['running', 'starting', 'unhealthy'].includes(card?.dataset.state)) {
+    if (!window.confirm(`应用 ${host} 后将重启「${name}」，是否继续？`)) return
+  }
+
+  button.disabled = true
+  try {
+    const route = action === 'backend-add' ? 'backend-hosts' : 'backend-target'
+    const payload = await api(`/api/services/${id}/${route}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Service-Control-Token': token,
+      },
+      body: JSON.stringify({ host }),
+    })
+    if (action === 'backend-add') {
+      backendDrafts.set(id, { selectedHost: host, newHost: '' })
+      showToast(`${host} 已保存，请点击“应用并重启”`)
+    } else {
+      backendDrafts.delete(id)
+      showToast(payload.restarted ? `${name} 已切换到 ${host} 并开始重启` : `${name} 已保存后端 ${host}，下次启动时生效`)
+    }
+    await refresh()
+  } catch (error) {
+    showToast(error.message, true)
+  } finally {
+    button.disabled = false
+  }
 }
 
 function formatServiceTime(value) {
