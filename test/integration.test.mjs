@@ -128,6 +128,24 @@ test('starts, restarts, logs, and stops a registered service through the HTTP AP
   const logs = await (await fetch(`http://127.0.0.1:${controlPort}/api/services/fixture/logs`)).json()
   assert.match(logs.logs, /starting fixture/)
 
+  const initialLogStream = await (await fetch(`http://127.0.0.1:${controlPort}/api/services/fixture/logs?stream=1`)).json()
+  assert.match(initialLogStream.logs, /starting fixture/)
+  assert.equal(Number.isInteger(initialLogStream.cursor), true)
+  fs.appendFileSync(path.join(runtimeDir, 'logs', 'fixture.log'), '[fixture] live error details\n')
+  const incrementalLogStream = await (await fetch(
+    `http://127.0.0.1:${controlPort}/api/services/fixture/logs?stream=1&cursor=${initialLogStream.cursor}&identity=${encodeURIComponent(initialLogStream.identity)}`,
+  )).json()
+  assert.equal(incrementalLogStream.logs, '[fixture] live error details\n')
+  assert.equal(incrementalLogStream.reset, false)
+
+  fs.writeFileSync(path.join(runtimeDir, 'logs', 'fixture.log.1'), '[fixture] archived failure context\n')
+  const downloadedLog = await fetch(`http://127.0.0.1:${controlPort}/api/services/fixture/logs/download`)
+  assert.equal(downloadedLog.ok, true)
+  assert.match(downloadedLog.headers.get('content-disposition') || '', /fixture-retained\.log/)
+  const downloadedText = await downloadedLog.text()
+  assert.match(downloadedText, /\[fixture\] archived failure context/)
+  assert.match(downloadedText, /\[fixture\] live error details/)
+
   await mutate(controlPort, token, 'stop')
   status = await waitForStatus(controlPort, 'stopped')
   assert.equal(status.pid, null)

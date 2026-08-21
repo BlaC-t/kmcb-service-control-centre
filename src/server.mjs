@@ -2,6 +2,7 @@ import crypto from 'node:crypto'
 import fs from 'node:fs'
 import http from 'node:http'
 import path from 'node:path'
+import { Readable } from 'node:stream'
 import { loadConfig, TOOL_ROOT } from './config.mjs'
 import { ProcessManager } from './process-manager.mjs'
 import { defaultRuntimeDir } from './runtime-paths.mjs'
@@ -39,9 +40,23 @@ const server = http.createServer(async (request, response) => {
       return
     }
 
+    const logDownloadMatch = url.pathname.match(/^\/api\/services\/([a-z0-9-]+)\/logs\/download$/)
+    if (request.method === 'GET' && logDownloadMatch) {
+      return downloadLog(response, manager, logDownloadMatch[1])
+    }
+
     const logsMatch = url.pathname.match(/^\/api\/services\/([a-z0-9-]+)\/logs$/)
     if (request.method === 'GET' && logsMatch) {
-      return json(response, 200, { id: logsMatch[1], logs: manager.logs(logsMatch[1], Number(url.searchParams.get('lines') || 200)) })
+      const id = logsMatch[1]
+      if (url.searchParams.get('stream') === '1') {
+        const cursorValue = url.searchParams.get('cursor')
+        const identity = url.searchParams.get('identity')
+        return json(response, 200, {
+          id,
+          ...manager.logChunk(id, cursorValue == null ? null : Number(cursorValue), { identity }),
+        })
+      }
+      return json(response, 200, { id, logs: manager.logs(id, Number(url.searchParams.get('lines') || 200)) })
     }
 
     const backendHostsMatch = url.pathname.match(/^\/api\/services\/([a-z0-9-]+)\/backend-hosts$/)
@@ -141,6 +156,7 @@ function serveStatic(pathname, response, root, controlToken, headOnly = false) {
     '/': ['index.html', 'text/html; charset=utf-8'],
     '/index.html': ['index.html', 'text/html; charset=utf-8'],
     '/app.js': ['app.js', 'text/javascript; charset=utf-8'],
+    '/log-view.js': ['log-view.js', 'text/javascript; charset=utf-8'],
     '/styles.css': ['styles.css', 'text/css; charset=utf-8'],
   }
   const entry = files[pathname]
@@ -165,6 +181,68 @@ function json(response, status, value) {
     'Cache-Control': 'no-store',
   })
   response.end(body)
+}
+
+function downloadLog(response, manager, id) {
+  manager.getService(id)
+  const logPath = manager.logPath(id)
+  const snapshots = [`${logPath}.1`, logPath].flatMap(filePath => {
+    try {
+      const fd = fs.openSync(filePath, 'r')
+      return [{ filePath, fd, size: fs.fstatSync(fd).size, closed: false }]
+    } catch (error) {
+      if (error.code === 'ENOENT') return []
+      throw error
+    }
+  })
+  if (!snapshots.length) return json(response, 404, { error: 'No managed log is available for this service.' })
+  const includeMarkers = snapshots.length > 1
+  for (const snapshot of snapshots) {
+    snapshot.marker = includeMarkers
+      ? Buffer.from(`[control] ===== ${path.basename(snapshot.filePath)} =====\n`, 'utf8')
+      : Buffer.alloc(0)
+  }
+  const size = snapshots.reduce((total, snapshot) => total + snapshot.marker.length + snapshot.size, 0)
+  response.writeHead(200, {
+    'Content-Type': 'text/plain; charset=utf-8',
+    'Content-Length': size,
+    'Content-Disposition': `attachment; filename="${id}-retained.log"`,
+    'Cache-Control': 'no-store',
+  })
+  const source = Readable.from(retainedLogChunks(snapshots))
+  source.on('error', error => response.destroy(error))
+  response.on('close', () => source.destroy())
+  source.pipe(response)
+}
+
+async function* retainedLogChunks(snapshots) {
+  try {
+    for (const snapshot of snapshots) {
+      if (snapshot.marker.length) yield snapshot.marker
+      if (snapshot.size > 0) {
+        const stream = fs.createReadStream(snapshot.filePath, {
+          fd: snapshot.fd,
+          autoClose: false,
+          start: 0,
+          end: snapshot.size - 1,
+        })
+        for await (const chunk of stream) yield chunk
+      }
+      closeSnapshot(snapshot)
+    }
+  } finally {
+    for (const snapshot of snapshots) closeSnapshot(snapshot)
+  }
+}
+
+function closeSnapshot(snapshot) {
+  if (snapshot.closed) return
+  snapshot.closed = true
+  try {
+    fs.closeSync(snapshot.fd)
+  } catch {
+    // The descriptor may already be closed after a stream error.
+  }
 }
 
 async function readJsonBody(request) {

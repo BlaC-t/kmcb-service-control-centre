@@ -81,11 +81,14 @@
           <span class="eyebrow">SERVICE OUTPUT</span>
           <h2 id="log-title">服务日志</h2>
         </div>
+        <div class="log-live-status" id="log-live-status"><span></span>每秒实时更新</div>
         <button class="icon-button" id="close-log" aria-label="关闭">×</button>
       </div>
       <pre id="log-content">暂无日志</pre>
       <div class="dialog-actions">
-        <button class="button secondary" id="refresh-log">刷新日志</button>
+        <a class="button secondary" id="download-log" href="#" download>下载完整日志</a>
+        <button class="button secondary" id="latest-log">跳到最新</button>
+        <button class="button secondary" id="refresh-log">重新加载</button>
         <button class="button" id="close-log-bottom">关闭</button>
       </div>
     </dialog>

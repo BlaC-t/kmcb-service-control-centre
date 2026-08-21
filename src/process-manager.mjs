@@ -332,12 +332,68 @@ export class ProcessManager extends EventEmitter {
     const logPath = this.logPath(id)
     if (!fs.existsSync(logPath)) return ''
     const stats = fs.statSync(logPath)
-    const start = Math.max(0, stats.size - 256 * 1024)
+    const start = Math.max(0, stats.size - 4 * 1024 * 1024)
     const fd = fs.openSync(logPath, 'r')
     const buffer = Buffer.alloc(stats.size - start)
     fs.readSync(fd, buffer, 0, buffer.length, start)
     fs.closeSync(fd)
-    return buffer.toString('utf8').split(/\r?\n/).slice(-Math.max(1, Math.min(lines, 1000))).join('\n')
+    return buffer.toString('utf8').split(/\r?\n/).slice(-Math.max(1, Math.min(lines, 10000))).join('\n')
+  }
+
+  logChunk(id, cursor = null, {
+    identity = null,
+    initialBytes = 2 * 1024 * 1024,
+    maxChunkBytes = 512 * 1024,
+  } = {}) {
+    this.getService(id)
+    const logPath = this.logPath(id)
+    let fd
+    try {
+      fd = fs.openSync(logPath, 'r')
+    } catch (error) {
+      if (error.code !== 'ENOENT') throw error
+      return {
+        logs: '',
+        cursor: 0,
+        identity: null,
+        reset: cursor == null || identity != null,
+        truncated: false,
+        hasMore: false,
+      }
+    }
+
+    const stats = fs.fstatSync(fd)
+    const size = stats.size
+    const currentIdentity = logFileIdentity(stats)
+    const parsedCursor = cursor == null ? null : Number(cursor)
+    const cursorIsValid = Number.isInteger(parsedCursor)
+      && parsedCursor >= 0
+      && parsedCursor <= size
+      && identity === currentIdentity
+    const reset = parsedCursor == null || !cursorIsValid
+    const start = reset ? Math.max(0, size - initialBytes) : parsedCursor
+    const readLimit = reset ? initialBytes : maxChunkBytes
+    const bytesToRead = Math.min(size - start, Math.max(1, readLimit))
+    if (bytesToRead <= 0) {
+      fs.closeSync(fd)
+      return { logs: '', cursor: start, identity: currentIdentity, reset, truncated: false, hasMore: false }
+    }
+
+    const buffer = Buffer.alloc(bytesToRead)
+    const bytesRead = fs.readSync(fd, buffer, 0, buffer.length, start)
+    fs.closeSync(fd)
+    const readableBuffer = buffer.subarray(0, bytesRead)
+    const completeBytes = completeUtf8PrefixLength(readableBuffer)
+    const textStart = leadingUtf8ContinuationBytes(readableBuffer.subarray(0, completeBytes))
+    const nextCursor = start + completeBytes
+    return {
+      logs: readableBuffer.subarray(textStart, completeBytes).toString('utf8'),
+      cursor: nextCursor,
+      identity: currentIdentity,
+      reset,
+      truncated: reset && start > 0,
+      hasMore: completeBytes > 0 && nextCursor < size,
+    }
   }
 
   getService(id) {
@@ -478,6 +534,28 @@ export function normalizeBackendHost(value) {
   const host = String(value || '').trim()
   if (!net.isIPv4(host)) throw new Error('Backend address must be a valid IPv4 address.')
   return host
+}
+
+function leadingUtf8ContinuationBytes(buffer) {
+  let index = 0
+  while (index < buffer.length && (buffer[index] & 0xc0) === 0x80) index += 1
+  return index
+}
+
+function completeUtf8PrefixLength(buffer) {
+  if (!buffer.length) return 0
+  let leadIndex = buffer.length - 1
+  while (leadIndex >= 0 && (buffer[leadIndex] & 0xc0) === 0x80) leadIndex -= 1
+  if (leadIndex < 0) return buffer.length
+
+  const lead = buffer[leadIndex]
+  const expectedLength = lead >= 0xf0 ? 4 : lead >= 0xe0 ? 3 : lead >= 0xc0 ? 2 : 1
+  const actualLength = buffer.length - leadIndex
+  return actualLength < expectedLength ? leadIndex : buffer.length
+}
+
+function logFileIdentity(stats) {
+  return `${stats.dev}:${stats.ino}:${stats.birthtimeMs}`
 }
 
 export function parseWindowsNetstat(stdout, port) {

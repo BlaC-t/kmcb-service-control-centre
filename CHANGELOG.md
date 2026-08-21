@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-08-21
+
+### Added
+
+- Added a complete retained-log download action that combines the previous rotated log and current log in chronological order.
+- Added cursor and file-identity based log reads so an open dialog fetches only newly appended output and reliably resets after rotation.
+
+### Changed
+
+- Raised the package version to `1.2.1`.
+- Changed the log dialog to update every second, immediately catch up after large bursts, cancel stale requests during reload or close, and preserve the reader's scroll position while inspecting older output.
+- Increased the initial log history from a fixed 260-line, 256 KiB tail to the latest 2 MiB, with an 8 MiB browser-view safeguard and a full-file download for older content.
+- Increased the legacy API tail allowance to 4 MiB and 10,000 lines for CLI and compatibility consumers.
+
+### Validation
+
+- `npm run check` completed successfully.
+- All 44 Node.js tests passed, including file-identity rotation resets, UTF-8 chunk boundaries, incremental reads, retained-log downloads, and scroll-position compensation after browser-view trimming.
+- Reinstalled the macOS control centre, restarted the real Trace frontend, and confirmed its incremental response contained only the new restart output while the retained-log download returned HTTP `200` with a stable snapshot filename.
+
 ## 2026-08-20
 
 ### Added

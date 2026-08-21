@@ -1,3 +1,5 @@
+import { adjustedLogScrollTop } from './log-view.js'
+
 const token = document.querySelector('meta[name="control-token"]').content
 const stateLabels = {
   running: '运行中 RUNNING',
@@ -18,15 +20,29 @@ const dialog = document.querySelector('#log-dialog')
 const logContent = document.querySelector('#log-content')
 const logTitle = document.querySelector('#log-title')
 const refreshLogButton = document.querySelector('#refresh-log')
+const latestLogButton = document.querySelector('#latest-log')
+const downloadLogLink = document.querySelector('#download-log')
+const logLiveStatus = document.querySelector('#log-live-status')
 const toast = document.querySelector('#toast')
+const logPollIntervalMs = 1000
+const maxLogViewCharacters = 8 * 1024 * 1024
+const retainedLogViewCharacters = 6 * 1024 * 1024
 let currentLogService = null
+let logCursor = null
+let logIdentity = null
+let logPollTimer = null
+let logRequestController = null
+let logRequestGeneration = 0
+let logViewCharacters = 0
 let toastTimer = null
 const backendDrafts = new Map()
 
 refreshButton.addEventListener('click', refresh)
-document.querySelector('#close-log').addEventListener('click', () => dialog.close())
-document.querySelector('#close-log-bottom').addEventListener('click', () => dialog.close())
-refreshLogButton.addEventListener('click', () => currentLogService && loadLogs(currentLogService))
+document.querySelector('#close-log').addEventListener('click', closeLogs)
+document.querySelector('#close-log-bottom').addEventListener('click', closeLogs)
+dialog.addEventListener('close', stopLogPolling)
+refreshLogButton.addEventListener('click', reloadLogs)
+latestLogButton.addEventListener('click', scrollLogsToLatest)
 frontendRoot.addEventListener('input', rememberBackendDraft)
 frontendRoot.addEventListener('change', rememberBackendDraft)
 
@@ -230,21 +246,139 @@ async function runAction(id, action, button) {
 }
 
 async function openLogs(id, name) {
+  stopLogPolling()
   currentLogService = id
+  logCursor = null
+  logIdentity = null
   logTitle.textContent = `${name} · 日志`
   logContent.textContent = '正在读取日志...'
+  logViewCharacters = logContent.textContent.length
+  logContent.dataset.empty = 'true'
+  downloadLogLink.href = `/api/services/${id}/logs/download`
+  downloadLogLink.download = `${id}-retained.log`
+  setLogLiveStatus('正在连接...')
   dialog.showModal()
-  await loadLogs(id)
+  await loadLogs(id, { reset: true })
+  scheduleLogPoll()
 }
 
-async function loadLogs(id) {
-  try {
-    const payload = await api(`/api/services/${id}/logs?lines=260`)
-    logContent.textContent = payload.logs || '暂无由控制中心记录的日志。外部进程日志仍在原启动终端或 IntelliJ 中。'
-    logContent.scrollTop = logContent.scrollHeight
-  } catch (error) {
-    logContent.textContent = error.message
+async function loadLogs(id, { reset = false, replacePending = false } = {}) {
+  if (logRequestController) {
+    if (!replacePending) return false
+    logRequestController.abort()
   }
+  const controller = new AbortController()
+  const requestGeneration = logRequestGeneration
+  logRequestController = controller
+  const followLatest = reset || isLogNearBottom()
+  try {
+    const cursorQuery = !reset && logCursor != null
+      ? `&cursor=${logCursor}${logIdentity ? `&identity=${encodeURIComponent(logIdentity)}` : ''}`
+      : ''
+    const payload = await api(`/api/services/${id}/logs?stream=1${cursorQuery}`, { signal: controller.signal })
+    if (requestGeneration !== logRequestGeneration || id !== currentLogService || !dialog.open) return false
+
+    if (reset || payload.reset) {
+      const prefix = payload.truncated
+        ? '[control] 当前窗口显示最近 2 MiB，点击“下载完整日志”可查看全部内容。\n\n'
+        : ''
+      logContent.textContent = `${prefix}${payload.logs || ''}`
+      logViewCharacters = logContent.textContent.length
+      logContent.dataset.empty = payload.logs ? 'false' : 'true'
+    } else if (payload.logs) {
+      if (logContent.dataset.empty === 'true') {
+        logContent.textContent = ''
+        logViewCharacters = 0
+      }
+      logContent.append(document.createTextNode(payload.logs))
+      logViewCharacters += payload.logs.length
+      logContent.dataset.empty = 'false'
+    }
+
+    if (logContent.dataset.empty === 'true') {
+      logContent.textContent = '暂无由控制中心记录的日志。外部进程日志仍在原启动终端或 IntelliJ 中。'
+      logViewCharacters = logContent.textContent.length
+    }
+    logCursor = payload.cursor
+    logIdentity = payload.identity
+    trimLogView({ preserveScroll: !followLatest })
+    if (followLatest) scrollLogsToLatest()
+    setLogLiveStatus(`实时更新 · ${new Date().toLocaleTimeString('zh-CN', { hour12: false })}`)
+    return payload.hasMore
+  } catch (error) {
+    if (error.name !== 'AbortError' && requestGeneration === logRequestGeneration && id === currentLogService && dialog.open) {
+      if (logContent.dataset.empty === 'true') {
+        logContent.textContent = error.message
+        logViewCharacters = logContent.textContent.length
+      }
+      setLogLiveStatus('连接异常，正在重试', true)
+    }
+  } finally {
+    if (logRequestController === controller) logRequestController = null
+  }
+}
+
+async function reloadLogs() {
+  if (!currentLogService) return
+  clearTimeout(logPollTimer)
+  logRequestGeneration += 1
+  logCursor = null
+  logIdentity = null
+  await loadLogs(currentLogService, { reset: true, replacePending: true })
+  scheduleLogPoll()
+}
+
+function scheduleLogPoll(delay = logPollIntervalMs) {
+  clearTimeout(logPollTimer)
+  if (!currentLogService || !dialog.open) return
+  logPollTimer = setTimeout(async () => {
+    const id = currentLogService
+    const hasMore = await loadLogs(id)
+    scheduleLogPoll(hasMore ? 0 : logPollIntervalMs)
+  }, delay)
+}
+
+function closeLogs() {
+  if (dialog.open) dialog.close()
+}
+
+function stopLogPolling() {
+  clearTimeout(logPollTimer)
+  logRequestGeneration += 1
+  logRequestController?.abort()
+  logRequestController = null
+  logPollTimer = null
+  currentLogService = null
+  logCursor = null
+  logIdentity = null
+}
+
+function isLogNearBottom() {
+  return logContent.scrollHeight - logContent.scrollTop - logContent.clientHeight < 80
+}
+
+function scrollLogsToLatest() {
+  logContent.scrollTop = logContent.scrollHeight
+}
+
+function trimLogView({ preserveScroll = false } = {}) {
+  if (logViewCharacters <= maxLogViewCharacters) return
+  const oldScrollTop = logContent.scrollTop
+  const oldScrollHeight = logContent.scrollHeight
+  const value = logContent.textContent
+  const overflow = value.length - retainedLogViewCharacters
+  const lineEnd = value.indexOf('\n', overflow)
+  const start = lineEnd >= 0 ? lineEnd + 1 : overflow
+  logContent.textContent = `[control] 较早内容已从窗口移除，请下载完整日志查看。\n\n${value.slice(start)}`
+  logViewCharacters = logContent.textContent.length
+  if (preserveScroll) {
+    logContent.scrollTop = adjustedLogScrollTop(oldScrollTop, oldScrollHeight, logContent.scrollHeight)
+  }
+}
+
+function setLogLiveStatus(message, error = false) {
+  logLiveStatus.lastChild.textContent = message
+  logLiveStatus.classList.toggle('error', error)
 }
 
 async function api(route, options = {}) {

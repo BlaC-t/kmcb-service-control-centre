@@ -530,9 +530,40 @@ dialog::backdrop {
 }
 
 .dialog-actions {
+  flex-wrap: wrap;
   justify-content: flex-end;
   border-top: 1px solid var(--line);
   border-bottom: 0;
+}
+
+.dialog-actions .button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+
+.log-live-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-left: auto;
+  color: var(--green);
+  font: 600 9px/1 var(--mono);
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+
+.log-live-status span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 10px currentColor;
+}
+
+.log-live-status.error {
+  color: var(--amber);
 }
 
 .icon-button {
@@ -545,7 +576,7 @@ dialog::backdrop {
 
 #log-content {
   min-height: 360px;
-  max-height: 62vh;
+  max-height: 68vh;
   margin: 0;
   padding: 18px;
   overflow: auto;

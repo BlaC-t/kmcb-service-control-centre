@@ -207,6 +207,47 @@ test('persists saved and selected backend hosts across manager reloads', t => {
   })
 })
 
+test('reads an initial log tail and then only newly appended bytes', t => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kmcb-service-log-chunk-'))
+  const runtimeDir = path.join(tempRoot, 'runtime')
+  t.after(() => fs.rmSync(tempRoot, { recursive: true, force: true }))
+  const config = validateConfig({
+    host: '127.0.0.1',
+    port: 17600,
+    workspaceRoot: tempRoot,
+    services: [{ id: 'fixture', cwd: '.', port: 17601, command: 'node server.mjs' }],
+  })
+  const manager = new ProcessManager(config, runtimeDir)
+  const logPath = manager.logPath('fixture')
+  fs.writeFileSync(logPath, 'first line\nsecond line\nthird line\n')
+
+  const initial = manager.logChunk('fixture', null, { initialBytes: 22 })
+  assert.equal(initial.reset, true)
+  assert.equal(initial.truncated, true)
+  assert.match(initial.logs, /third line/)
+  assert.equal(initial.cursor, fs.statSync(logPath).size)
+
+  fs.appendFileSync(logPath, 'live error line\n')
+  const appended = manager.logChunk('fixture', initial.cursor, { identity: initial.identity })
+  assert.equal(appended.logs, 'live error line\n')
+  assert.equal(appended.reset, false)
+  assert.equal(appended.hasMore, false)
+
+  fs.renameSync(logPath, `${logPath}.old`)
+  fs.writeFileSync(logPath, `rotated log\n${'new file content\n'.repeat(8)}`)
+  const rotated = manager.logChunk('fixture', appended.cursor, { identity: appended.identity })
+  assert.match(rotated.logs, /^rotated log/)
+  assert.equal(rotated.reset, true)
+
+  fs.writeFileSync(logPath, 'A你B')
+  const utf8Snapshot = manager.logChunk('fixture')
+  const utf8First = manager.logChunk('fixture', 0, { identity: utf8Snapshot.identity, maxChunkBytes: 3 })
+  const utf8Second = manager.logChunk('fixture', utf8First.cursor, { identity: utf8First.identity, maxChunkBytes: 3 })
+  const utf8Third = manager.logChunk('fixture', utf8Second.cursor, { identity: utf8Second.identity, maxChunkBytes: 3 })
+  assert.equal(`${utf8First.logs}${utf8Second.logs}${utf8Third.logs}`, 'A你B')
+  assert.doesNotMatch(`${utf8First.logs}${utf8Second.logs}${utf8Third.logs}`, /�/)
+})
+
 test('controls only a listener inside its managed Windows process tree', async t => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kmcb-service-windows-tree-'))
   const runtimeDir = path.join(tempRoot, 'runtime')

@@ -28,3 +28,15 @@ test('offers saved backend IPv4 selection and apply-restart controls on frontend
   assert.match(app, /target\.activeHost/)
   assert.match(app, /127\.0\.0\.1|本机/)
 })
+
+test('streams incremental logs and offers the complete managed log for download', () => {
+  assert.match(html, /id="log-live-status"/)
+  assert.match(html, /id="download-log"/)
+  assert.match(app, /logs\?stream=1/)
+  assert.match(app, /cursor=\$\{logCursor\}/)
+  assert.match(app, /identity=\$\{encodeURIComponent\(logIdentity\)\}/)
+  assert.match(app, /logPollIntervalMs = 1000/)
+  assert.match(app, /logs\/download/)
+  assert.match(app, /AbortController/)
+  assert.match(app, /createTextNode\(payload\.logs\)/)
+})
